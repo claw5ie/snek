@@ -5,6 +5,113 @@ const RIGHT = 8;
 const BOTTOM = -6;
 const TOP = 6;
 
+class Mat4
+{
+		data;
+
+		constructor(float32array)
+		{
+				this.data = float32array;
+		}
+
+		at(row, column)
+		{
+				return this.data[4 * column + row];
+		}
+
+		set2(column, x, y)
+		{
+				const offset = 4 * column;
+				this.data[offset + 0] = x;
+				this.data[offset + 1] = y;
+		}
+};
+
+class Vec2
+{
+		x;
+		y;
+
+		constructor(x, y)
+		{
+				this.x = x;
+				this.y = y;
+		}
+
+		copy(v)
+		{
+				this.x = v.x;
+				this.y = v.y;
+		}
+
+		set(x, y)
+		{
+				this.x = x;
+				this.y = y;
+		}
+
+		add(v)
+		{
+				this.x += v.x;
+				this.y += v.y;
+		}
+
+		equal(v)
+		{
+				return this.x === v.x && this.y === v.y;
+		}
+};
+
+class Segment
+{
+		pos;
+		dir;
+
+		constructor(pos, dir)
+		{
+				this.pos = pos;
+				this.dir = dir;
+		}
+};
+
+class Snake
+{
+		body;
+		count;
+		capacity;
+
+		constructor()
+		{
+				this.count = 3;
+				this.capacity = (RIGHT - LEFT) * (TOP - BOTTOM) * 4;
+				this.body = new Array(this.capacity);
+
+				for (let i = 0; i < this.capacity; i++)
+						this.body[i] = new Segment(new Vec2(0, 0), new Vec2(0, 0));
+
+				this.body[0].pos.set( 0, 0);
+				this.body[0].dir.set(-1, 0);
+
+				this.body[1].pos.set( 1, 0);
+				this.body[1].dir.set(-1, 0);
+
+				this.body[2].pos.set( 2, 0);
+				this.body[2].dir.set(-1, 0);
+		}
+
+		move()
+		{
+				this.body[0].pos.add(this.body[0].dir);
+
+				for (let i = this.count; i-- > 1; )
+				{
+						const segment = this.body[i];
+						segment.pos.add(segment.dir);
+						segment.dir.copy(this.body[i - 1].dir);
+				}
+		}
+};
+
 main();
 
 function main()
@@ -15,45 +122,45 @@ function main()
         return;
     }
 
-    const transform = new Float32Array([1, 0, 0, 0,
-                                        0, 1, 0, 0,
-                                        0, 0, 1, 0,
-                                        0, 0, 0, 1]);
-		var direction = new Float32Array([0, 0]);
+		const snake = new Snake();
+
+		const transform = new Mat4(
+				new Float32Array([1, 0, 0, 0,
+													0, 1, 0, 0,
+													0, 0, 1, 0,
+													0, 0, 0, 1])
+		);
 
     document.addEventListener('keydown', function(event) {
         switch (event.key)
         {
             case "s":
             {
-                direction[0] = 0;
-                direction[1] = -1;
+								snake.body[0].dir.set(0, -1);
             } break;
             case "w":
             {
-                direction[0] = 0;
-                direction[1] = 1;
+								snake.body[0].dir.set(0, 1);
             } break;
             case "a":
             {
-                direction[0] = -1;
-                direction[1] = 0;
+								snake.body[0].dir.set(-1, 0);
             } break;
             case "d":
             {
-                direction[0] = 1;
-                direction[1] = 0;
+								snake.body[0].dir.set(1, 0);
             } break;
         }
     });
 
-    const data = new Float32Array([0, 0,
-                                   0, 1,
-                                   1, 0,
-                                   1, 1]);
     const buffer = gl.createBuffer(1);
     gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-    gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
+    gl.bufferData(gl.ARRAY_BUFFER,
+									new Float32Array([0, 0,
+																		0, 1,
+																		1, 0,
+																		1, 1]),
+									gl.STATIC_DRAW);
 
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(0);
@@ -75,10 +182,11 @@ function main()
     const program = create_program(vertex_shader, fragment_shader);
 
     const transform_loc = gl.getUniformLocation(program, "transform");
-    if (transform_loc === 0)
+    if (transform_loc === 0) {
         alert("couldn't find uniform \"transform\"");
+    }
 		const projection_loc = gl.getUniformLocation(program, "projection");
-    if (transform_loc === 0)
+    if (projection_loc === 0)
         alert("couldn't find uniform \"projection\"");
 
 		const projection = new Float32Array([ 2.0 / (RIGHT - LEFT), 0, 0, -1.0 * (RIGHT + LEFT) / (RIGHT - LEFT),
@@ -91,25 +199,27 @@ function main()
 
     gl.clearColor(73/255.0, 89/255.0, 81/255.0, 1.0);
 
-		var i = 0;
+		let i = 0;
 
     function go()
     {
         gl.clear(gl.COLOR_BUFFER_BIT);
 
-				if (i % 32 == 0)
+				if (i % 32 === 0)
+						snake.move();
+
+				gl.useProgram(program);
+				for (let i = 0; i < snake.count; i++)
 				{
-						transform[12] += direction[0];
-						transform[13] += direction[1];
+						const segment = snake.body[i];
+						transform.set2(3, segment.pos.x, segment.pos.y);
+						gl.uniformMatrix4fv(transform_loc, false, transform.data);
+						gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 				}
 
-        gl.useProgram(program);
-        gl.uniformMatrix4fv(transform_loc, false, transform);
-        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+				i += 1;
 
         window.requestAnimationFrame(go);
-
-				i += 1;
     }
 
     go();
