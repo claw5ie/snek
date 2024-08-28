@@ -69,7 +69,12 @@ class Vec2 {
 				this.y = y;
 		}
 
-		copy(v: Vec2)
+    copy0(): Vec2
+    {
+        return new Vec2(this.x, this.y);
+    }
+
+		copy1(v: Vec2)
 		{
 				this.x = v.x;
 				this.y = v.y;
@@ -96,9 +101,11 @@ class Vec2 {
 class Mat4 {
 		data: Float32Array;
 
-		constructor(array: Float32Array)
+		constructor(array: number[])
 		{
-				this.data = array;
+        if (array.length != 16)
+            alert("expected 16 values, but got " + array.length);
+				this.data = new Float32Array(array);
 		}
 
 		at(row: number, column: number): number
@@ -147,10 +154,22 @@ class Snake {
 				{
 						segment = it.data;
 						segment.pos.add(segment.dir);
-						segment.dir.copy(it.prev.data.dir);
+						segment.dir.copy1(it.prev.data.dir);
             it = it.prev;
 				}
 		}
+
+    is_position_occupied(pos: Vec2): boolean
+    {
+        let it = this.body.first;
+				while (it != null)
+				{
+            if (it.data.pos.equal(pos))
+                return true;
+            it = it.next;
+				}
+        return false;
+    }
 };
 
 const canvas = document.getElementById("canvas") as HTMLCanvasElement;
@@ -162,6 +181,27 @@ const TOP = 6;
 
 main();
 
+function find_food_position(snake: Snake): Vec2
+{
+    const free_block_count = (RIGHT - LEFT) * (TOP - BOTTOM) - snake.body.count;
+
+    let index = rand_range(0, free_block_count);
+    for (const pos = new Vec2(LEFT, BOTTOM); pos.y < TOP; pos.y++)
+    {
+        for (pos.x = LEFT; pos.x < RIGHT; pos.x++)
+        {
+            if (!snake.is_position_occupied(pos))
+            {
+                if (index == 0)
+                    return pos;
+                index--;
+            }
+        }
+    }
+
+    return null;
+}
+
 function main()
 {
     if (gl === null)
@@ -171,28 +211,34 @@ function main()
     }
 
 		const snake = new Snake();
+    let food = find_food_position(snake);
 
 		const transform = new Mat4(
-				new Float32Array([1, 0, 0, 0,
-													0, 1, 0, 0,
-													0, 0, 1, 0,
-													0, 0, 0, 1])
-		);
+        [1, 0, 0, 0,
+				 0, 1, 0, 0,
+				 0, 0, 1, 0,
+				 0, 0, 0, 1]
+    );
 
     document.addEventListener('keydown', function(event) {
+        const segment = snake.body.first.data;
         switch (event.key)
         {
             case "s": {
-                snake.body.first.data.dir.put(0, -1);
+                if (!segment.dir.equal(new Vec2(0, 1)))
+                    segment.dir.put(0, -1);
             } break;
             case "w": {
-                snake.body.first.data.dir.put(0, 1);
+                if (!segment.dir.equal(new Vec2(0, -1)))
+                    snake.body.first.data.dir.put(0, 1);
             } break;
             case "a": {
-                snake.body.first.data.dir.put(-1, 0);
+                if (!segment.dir.equal(new Vec2(1, 0)))
+                    snake.body.first.data.dir.put(-1, 0);
             } break;
             case "d": {
-                snake.body.first.data.dir.put(1, 0);
+                if (!segment.dir.equal(new Vec2(-1, 0)))
+                    snake.body.first.data.dir.put(1, 0);
             } break;
         }
     });
@@ -249,8 +295,22 @@ function main()
     {
         gl.clear(gl.COLOR_BUFFER_BIT);
 
-				if (i % 32 === 0)
-						snake.move();
+				if (i % 32 == 0)
+        {
+						const segment = snake.body.first.data;
+            const head = segment.pos.copy0();
+            head.add(segment.dir);
+
+            if (head.equal(food))
+            {
+                snake.body.insert_first(new SnakeSegment(head, segment.dir.copy0()));
+                food = find_food_position(snake);
+            }
+            else
+            {
+                snake.move();
+            }
+        }
 
 				gl.useProgram(program);
 
@@ -261,6 +321,10 @@ function main()
 						gl.uniformMatrix4fv(transform_loc, false, transform.data);
 						gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 				}
+
+        transform.set2(3, food.x, food.y);
+        gl.uniformMatrix4fv(transform_loc, false, transform.data);
+				gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
 				i += 1;
 
@@ -299,4 +363,11 @@ function create_program(vertex_shader: WebGLShader, fragment_shader: WebGLShader
     }
 
     return program;
+}
+
+function rand_range(min: number, max: number): number
+{
+    min = Math.ceil(min);
+    max = Math.floor(max);
+    return Math.floor(Math.random() * (max - min + 1) + min);
 }
