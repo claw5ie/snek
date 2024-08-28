@@ -174,6 +174,7 @@ class Snake {
 
 const canvas = document.getElementById("canvas") as HTMLCanvasElement;
 const gl = canvas.getContext("webgl");
+
 const LEFT = -8;
 const RIGHT = 8;
 const BOTTOM = -6;
@@ -213,13 +214,6 @@ function main()
 		const snake = new Snake();
     let food = find_food_position(snake);
 
-		const transform = new Mat4(
-        [1, 0, 0, 0,
-				 0, 1, 0, 0,
-				 0, 0, 1, 0,
-				 0, 0, 0, 1]
-    );
-
     document.addEventListener('keydown', function(event) {
         const segment = snake.body.first.data;
         switch (event.key)
@@ -255,34 +249,46 @@ function main()
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(0);
 
-    const vertex_shader_source = "attribute vec2 position;\n"
-        + "uniform mat4 transform;\n"
-				+ "uniform mat4 projection;\n"
-        + "void main()\n"
-        + "{\n"
-        + "  gl_Position = projection * transform * vec4(position, 0.0, 1.0);\n"
-        + "}\n";
-    const fragment_shader_source = "void main()\n"
-        + "{\n"
-        + "  gl_FragColor = vec4(70.0/255.0, 70.0/255.0, 70.0/255.0, 1.0);\n"
-        + "}\n";
+    const program = function() {
+        const vertex_shader_source = "attribute vec2 position;\n"
+            + "uniform mat4 transform;\n"
+				    + "uniform mat4 projection;\n"
+            + "void main()\n"
+            + "{\n"
+            + "  gl_Position = projection * transform * vec4(position, 0.0, 1.0);\n"
+            + "}\n";
+        const fragment_shader_source = "void main()\n"
+            + "{\n"
+            + "  gl_FragColor = vec4(70.0/255.0, 70.0/255.0, 70.0/255.0, 1.0);\n"
+            + "}\n";
 
-    const vertex_shader = create_shader(gl.VERTEX_SHADER, vertex_shader_source);
-    const fragment_shader = create_shader(gl.FRAGMENT_SHADER, fragment_shader_source);
-    const program = create_program(vertex_shader, fragment_shader);
+        const vertex_shader = create_shader(gl.VERTEX_SHADER, vertex_shader_source);
+        const fragment_shader = create_shader(gl.FRAGMENT_SHADER, fragment_shader_source);
+        const program = create_program(vertex_shader, fragment_shader);
+        gl.deleteShader(vertex_shader);
+        gl.deleteShader(fragment_shader);
+        return program;
+    }();
 
+    const transform = new Mat4(
+        [1, 0, 0, 0,
+				 0, 1, 0, 0,
+				 0, 0, 1, 0,
+				 0, 0, 0, 1]
+    );
     const transform_loc = gl.getUniformLocation(program, "transform");
+
+    const projection = new Float32Array([
+        2.0 / (RIGHT - LEFT), 0, 0, 0,
+				0, 2.0 / (TOP - BOTTOM), 0, 0,
+				0, 0, 1, 0,
+				-1.0 * (RIGHT + LEFT) / (RIGHT - LEFT), -1.0 * (TOP + BOTTOM) / (TOP - BOTTOM), 0, 1, ]);
     if (transform_loc === 0) {
         alert("couldn't find uniform \"transform\"");
     }
 		const projection_loc = gl.getUniformLocation(program, "projection");
     if (projection_loc === 0)
         alert("couldn't find uniform \"projection\"");
-
-		const projection = new Float32Array([ 2.0 / (RIGHT - LEFT), 0, 0, -1.0 * (RIGHT + LEFT) / (RIGHT - LEFT),
-																					0, 2.0 / (TOP - BOTTOM), 0, -1.0 * (TOP + BOTTOM) / (TOP - BOTTOM),
-																					0, 0, 1, 0,
-																					0, 0, 0, 1, ]);
 
 		gl.useProgram(program);
     gl.uniformMatrix4fv(projection_loc, false, projection);
