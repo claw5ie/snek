@@ -133,6 +133,11 @@ class Uniform {
     }
 };
 
+const LEFT = -8;
+const RIGHT = 8;
+const BOTTOM = -6;
+const TOP = 6;
+
 class Renderer {
     gl: WebGLRenderingContext;
     buffer: WebGLBuffer;
@@ -323,11 +328,6 @@ class Snake {
         return false;
     }
 };
-
-const LEFT = -8;
-const RIGHT = 8;
-const BOTTOM = -6;
-const TOP = 6;
 
 class Game {
     snake: Snake;
