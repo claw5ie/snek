@@ -161,7 +161,7 @@ class Renderer {
             0
         );
 
-        const program = function() {
+        const program = function(gh: WebGLRenderingContext) {
             const vertex_shader_source = "attribute vec2 position;\n"
                 + "uniform mat4 transform;\n"
 				        + "uniform mat4 projection;\n"
@@ -174,13 +174,13 @@ class Renderer {
                 + "  gl_FragColor = vec4(70.0/255.0, 70.0/255.0, 70.0/255.0, 1.0);\n"
                 + "}\n";
 
-            const vertex_shader = create_shader(gl.VERTEX_SHADER, vertex_shader_source);
-            const fragment_shader = create_shader(gl.FRAGMENT_SHADER, fragment_shader_source);
-            const program = create_program(vertex_shader, fragment_shader);
+            const vertex_shader = create_shader(gl, gl.VERTEX_SHADER, vertex_shader_source);
+            const fragment_shader = create_shader(gl, gl.FRAGMENT_SHADER, fragment_shader_source);
+            const program = create_program(gl, vertex_shader, fragment_shader);
             gl.deleteShader(vertex_shader);
             gl.deleteShader(fragment_shader);
             return program;
-        }();
+        }(this.gl);
 
         const transform_uniform_name = "transform";
         const projection_uniform_name = "projection";
@@ -246,7 +246,7 @@ class Renderer {
         data[4 * 3 + 0] = position.x;
         data[4 * 3 + 1] = position.y;
 
-        this.draw(gl.TRIANGLE_STRIP, 0, 4);
+        this.draw(this.gl.TRIANGLE_STRIP, 0, 4);
     }
 
     draw(mode: number, start: number, count: number): void
@@ -323,9 +323,6 @@ class Snake {
         return false;
     }
 };
-
-const canvas = document.getElementById("canvas") as HTMLCanvasElement;
-const gl = canvas.getContext("webgl");
 
 const LEFT = -8;
 const RIGHT = 8;
@@ -422,22 +419,27 @@ main();
 
 function main(): void
 {
-    if (gl === null)
-    {
-        alert("Unable to initialize WebGL. Your browser or machine may not support it.");
-        return;
-    }
+    let renderer = function (){
+        const canvas = document.getElementById("canvas") as HTMLCanvasElement;
+        const gl = canvas.getContext("webgl");
 
-    let renderer = new Renderer(gl);
+        if (gl === null)
+        {
+            alert("Unable to initialize WebGL. Your browser or machine may not support it.");
+            return;
+        }
+
+        return new Renderer(gl);
+    }();
     let game = new Game();
 
-    gl.clearColor(73/255.0, 89/255.0, 81/255.0, 1.0);
+    renderer.gl.clearColor(73/255.0, 89/255.0, 81/255.0, 1.0);
 
 		let i = 0;
 
     function go()
     {
-        gl.clear(gl.COLOR_BUFFER_BIT);
+        renderer.gl.clear(renderer.gl.COLOR_BUFFER_BIT);
 
 				if (i % 32 == 0)
         {
@@ -454,7 +456,7 @@ function main(): void
     go();
 }
 
-function create_shader(type: number, source: string): WebGLShader
+function create_shader(gl: WebGLRenderingContext, type: number, source: string): WebGLShader
 {
     const shader = gl.createShader(type);
 
@@ -468,7 +470,7 @@ function create_shader(type: number, source: string): WebGLShader
     return shader;
 }
 
-function create_program(vertex_shader: WebGLShader, fragment_shader: WebGLShader): WebGLProgram
+function create_program(gl: WebGLRenderingContext, vertex_shader: WebGLShader, fragment_shader: WebGLShader): WebGLProgram
 {
     const program = gl.createProgram();
 
