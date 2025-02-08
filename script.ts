@@ -1,7 +1,7 @@
 class DoublyLinkedListNode<T> {
     data: T;
     next: DoublyLinkedListNode<T> = null;
-    prev: DoublyLinkedListNode<T> = null;
+    previous: DoublyLinkedListNode<T> = null;
 
     constructor(data: T)
     {
@@ -14,48 +14,49 @@ class DoublyLinkedList<T> {
     last: DoublyLinkedListNode<T> = null;
     count: number = 0;
 
-    constructor(elems: T[])
+    constructor(elements: T[])
     {
-        for (const elem of elems)
-            this.insert_last(elem);
+        for (const element of elements) {
+            this.insert_last(element);
+        }
     }
 
-    insert_last(data: T)
+    insert_last(data: T): void
     {
         const node = new DoublyLinkedListNode(data);
 
         if (this.count > 0)
         {
             this.last.next = node;
-            node.prev = this.last;
+            node.previous = this.last;
             this.last = node;
+            this.count += 1;
         }
         else
         {
             this.first = node;
             this.last = node;
+            this.count = 1;
         }
-
-        this.count += 1;
     }
 
-    insert_first(data: T)
+    insert_first(data: T): void
     {
         const node = new DoublyLinkedListNode(data);
 
         if (this.count > 0)
         {
-            this.first.prev = node;
+            this.first.previous = node;
             node.next = this.first;
             this.first = node;
+            this.count += 1;
         }
         else
         {
             this.first = node;
             this.last = node;
+            this.count = 1;
         }
-
-        this.count += 1;
     }
 };
 
@@ -69,24 +70,24 @@ class Vec2 {
 				this.y = y;
 		}
 
-    copy0(): Vec2
+    copy(): Vec2
     {
         return new Vec2(this.x, this.y);
     }
 
-		copy1(v: Vec2)
+		copy_from_vec2(v: Vec2)
 		{
 				this.x = v.x;
 				this.y = v.y;
 		}
 
-		put(x: number, y: number)
+		put(x: number, y: number): void
 		{
 				this.x = x;
 				this.y = y;
 		}
 
-		add(v: Vec2)
+		add(v: Vec2): void
 		{
 				this.x += v.x;
 				this.y += v.y;
@@ -98,6 +99,170 @@ class Vec2 {
 		}
 };
 
+class VertexArrayAttribute {
+    location: number;
+    components: number;
+    typ: number;
+    normalize: boolean;
+    stride: number;
+    offset: number;
+
+    constructor(location: number,
+                components: number,
+                typ: number,
+                normalize: boolean,
+                stride: number,
+                offset: number) {
+        this.location   = location;
+        this.components = components;
+        this.typ        = typ;
+        this.normalize  = normalize;
+        this.stride     = stride;
+        this.offset     = offset;
+    }
+};
+
+class Uniform {
+    location: WebGLUniformLocation;
+    matrix: Mat4;
+
+    constructor(location: WebGLUniformLocation,
+                matrix: Mat4) {
+        this.location = location;
+        this.matrix   = matrix;
+    }
+};
+
+class Renderer {
+    gl: WebGLRenderingContext;
+    buffer: WebGLBuffer;
+    attributes: VertexArrayAttribute[];
+    program: WebGLProgram;
+    uniforms: Map<string, Uniform>;
+
+    constructor(gl: WebGLRenderingContext)
+    {
+        const buffer = gl.createBuffer();
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+        gl.bufferData(gl.ARRAY_BUFFER,
+									    new Float32Array([0, 0,
+																		    0, 1,
+																		    1, 0,
+																		    1, 1]),
+									    gl.STATIC_DRAW);
+
+        const attribute = new VertexArrayAttribute(
+            0,
+            2,
+            gl.FLOAT,
+            false,
+            0,
+            0
+        );
+
+        const program = function() {
+            const vertex_shader_source = "attribute vec2 position;\n"
+                + "uniform mat4 transform;\n"
+				        + "uniform mat4 projection;\n"
+                + "void main()\n"
+                + "{\n"
+                + "  gl_Position = projection * transform * vec4(position, 0.0, 1.0);\n"
+                + "}\n";
+            const fragment_shader_source = "void main()\n"
+                + "{\n"
+                + "  gl_FragColor = vec4(70.0/255.0, 70.0/255.0, 70.0/255.0, 1.0);\n"
+                + "}\n";
+
+            const vertex_shader = create_shader(gl.VERTEX_SHADER, vertex_shader_source);
+            const fragment_shader = create_shader(gl.FRAGMENT_SHADER, fragment_shader_source);
+            const program = create_program(vertex_shader, fragment_shader);
+            gl.deleteShader(vertex_shader);
+            gl.deleteShader(fragment_shader);
+            return program;
+        }();
+
+        const transform_uniform_name = "transform";
+        const projection_uniform_name = "projection";
+
+        gl.useProgram(program);
+        const transform_loc = gl.getUniformLocation(program, transform_uniform_name);
+        const projection_loc = gl.getUniformLocation(program, projection_uniform_name);
+
+        if (transform_loc === 0)
+            alert("couldn't find uniform \"transform\"");
+
+        if (projection_loc === 0)
+            alert("couldn't find uniform \"projection\"");
+
+        const transform_matrix = new Mat4([
+            1, 0, 0, 0,
+				    0, 1, 0, 0,
+				    0, 0, 1, 0,
+				    0, 0, 0, 1,
+        ]);
+        const projection_matrix = new Mat4([
+            2.0 / (RIGHT - LEFT), 0, 0, 0,
+				    0, 2.0 / (TOP - BOTTOM), 0, 0,
+				    0, 0, 1, 0,
+				    (-1.0) * (RIGHT + LEFT) / (RIGHT - LEFT), (-1.0) * (TOP + BOTTOM) / (TOP - BOTTOM), 0, 1,
+        ]);
+
+        const uniforms = new Map<string, Uniform>([
+            [transform_uniform_name, new Uniform(transform_loc, transform_matrix)],
+            [projection_uniform_name, new Uniform(projection_loc, projection_matrix)],
+        ]);
+
+        this.gl = gl;
+        this.buffer = buffer;
+        this.attributes = [attribute];
+        this.program = program;
+        this.uniforms = uniforms;
+    }
+
+    bind(): void
+    {
+        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.buffer);
+        for (const attribute of this.attributes)
+        {
+            this.gl.vertexAttribPointer(
+                attribute.location,
+                attribute.components,
+                attribute.typ,
+                attribute.normalize,
+                attribute.stride,
+                attribute.offset);
+            this.gl.enableVertexAttribArray(attribute.location);
+        }
+    }
+
+    draw_rect(position: Vec2, width: number, height: number): void
+    {
+        const uniform = this.uniforms.get("transform");
+
+        let data = uniform.matrix.data;
+        data[4 * 0 + 0] = width;
+        data[4 * 1 + 1] = height;
+        data[4 * 3 + 0] = position.x;
+        data[4 * 3 + 1] = position.y;
+
+        this.draw(gl.TRIANGLE_STRIP, 0, 4);
+    }
+
+    draw(mode: number, start: number, count: number): void
+    {
+        this.bind();
+
+        this.gl.useProgram(this.program);
+        for (const [_, info] of this.uniforms)
+        {
+            this.gl.uniformMatrix4fv(info.location, false, info.matrix.data);
+        }
+
+        this.gl.drawArrays(mode, start, count);
+    }
+};
+
 class Mat4 {
 		data: Float32Array;
 
@@ -107,28 +272,16 @@ class Mat4 {
             alert("expected 16 values, but got " + array.length);
 				this.data = new Float32Array(array);
 		}
-
-		at(row: number, column: number): number
-		{
-				return this.data[4 * column + row];
-		}
-
-		set2(column: number, x: number, y: number)
-		{
-				const offset = 4 * column;
-				this.data[offset + 0] = x;
-				this.data[offset + 1] = y;
-		}
 };
 
 class SnakeSegment {
-		pos: Vec2;
-		dir: Vec2;
+		position: Vec2;
+		direction: Vec2;
 
-		constructor(pos: Vec2, dir: Vec2)
+		constructor(position: Vec2, direction: Vec2)
 		{
-				this.pos = pos;
-				this.dir = dir;
+				this.position = position;
+				this.direction = direction;
 		}
 };
 
@@ -144,27 +297,26 @@ class Snake {
         ]);
 		}
 
-		move()
+		move(): void
 		{
-        let segment = this.body.first.data;
-				segment.pos.add(segment.dir);
-
         let it = this.body.last;
-				for (let i = this.body.count; i-- > 1; )
+				for (let i = this.body.count; i-- > 1; it = it.previous)
 				{
-						segment = it.data;
-						segment.pos.add(segment.dir);
-						segment.dir.copy1(it.prev.data.dir);
-            it = it.prev;
+						let segment = it.data;
+						segment.position.add(segment.direction);
+						segment.direction.copy_from_vec2(it.previous.data.direction);
 				}
+
+        let segment = it.data;
+				segment.position.add(segment.direction);
 		}
 
-    is_position_occupied(pos: Vec2): boolean
+    is_position_occupied(position: Vec2): boolean
     {
         let it = this.body.first;
 				while (it != null)
 				{
-            if (it.data.pos.equal(pos))
+            if (it.data.position.equal(position))
                 return true;
             it = it.next;
 				}
@@ -180,30 +332,95 @@ const RIGHT = 8;
 const BOTTOM = -6;
 const TOP = 6;
 
-main();
+class Game {
+    snake: Snake;
+    food_position: Vec2;
 
-function find_food_position(snake: Snake): Vec2
-{
-    const free_block_count = (RIGHT - LEFT) * (TOP - BOTTOM) - snake.body.count;
+    constructor() {
+        this.snake = new Snake();
+        this.food_position = this.find_food_position();
 
-    let index = rand_range(0, free_block_count);
-    for (const pos = new Vec2(LEFT, BOTTOM); pos.y < TOP; pos.y++)
-    {
-        for (pos.x = LEFT; pos.x < RIGHT; pos.x++)
-        {
-            if (!snake.is_position_occupied(pos))
+        const snake = this.snake;
+
+        document.addEventListener('keydown', function(event) {
+            const segment = snake.body.first.data;
+
+            switch (event.key)
             {
-                if (index == 0)
-                    return pos;
-                index--;
+                case "s": {
+                    if (!segment.direction.equal(new Vec2(0, 1)))
+                        snake.body.first.data.direction.put(0, -1);
+                } break;
+                case "w": {
+                    if (!segment.direction.equal(new Vec2(0, -1)))
+                        snake.body.first.data.direction.put(0, 1);
+                } break;
+                case "a": {
+                    if (!segment.direction.equal(new Vec2(1, 0)))
+                        snake.body.first.data.direction.put(-1, 0);
+                } break;
+                case "d": {
+                    if (!segment.direction.equal(new Vec2(-1, 0)))
+                        snake.body.first.data.direction.put(1, 0);
+                } break;
             }
+        });
+    }
+
+    find_food_position(): Vec2
+    {
+        const free_block_count = (RIGHT - LEFT) * (TOP - BOTTOM) - this.snake.body.count;
+
+        let index = rand_range(0, free_block_count);
+        for (const pos = new Vec2(LEFT, BOTTOM); pos.y < TOP; pos.y++)
+        {
+            for (pos.x = LEFT; pos.x < RIGHT; pos.x++)
+            {
+                if (!this.snake.is_position_occupied(pos))
+                {
+                    if (index == 0)
+                        return pos;
+                    index--;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    move(): void
+    {
+        const segment = this.snake.body.first.data;
+        const head = segment.position.copy();
+
+        head.add(segment.direction);
+
+        if (head.equal(this.food_position))
+        {
+            this.snake.body.insert_first(new SnakeSegment(head, segment.direction.copy()));
+            this.food_position = this.find_food_position();
+        }
+        else
+        {
+            this.snake.move();
         }
     }
 
-    return null;
-}
+    render(renderer: Renderer): void
+    {
+        for (let it = this.snake.body.first; it != null; it = it.next)
+				{
+            const segment = it.data;
+            renderer.draw_rect(segment.position, 1, 1);
+				}
 
-function main()
+        renderer.draw_rect(this.food_position, 1, 1);
+    }
+};
+
+main();
+
+function main(): void
 {
     if (gl === null)
     {
@@ -211,87 +428,8 @@ function main()
         return;
     }
 
-		const snake = new Snake();
-    let food = find_food_position(snake);
-
-    document.addEventListener('keydown', function(event) {
-        const segment = snake.body.first.data;
-        switch (event.key)
-        {
-            case "s": {
-                if (!segment.dir.equal(new Vec2(0, 1)))
-                    segment.dir.put(0, -1);
-            } break;
-            case "w": {
-                if (!segment.dir.equal(new Vec2(0, -1)))
-                    snake.body.first.data.dir.put(0, 1);
-            } break;
-            case "a": {
-                if (!segment.dir.equal(new Vec2(1, 0)))
-                    snake.body.first.data.dir.put(-1, 0);
-            } break;
-            case "d": {
-                if (!segment.dir.equal(new Vec2(-1, 0)))
-                    snake.body.first.data.dir.put(1, 0);
-            } break;
-        }
-    });
-
-    const buffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-    gl.bufferData(gl.ARRAY_BUFFER,
-									new Float32Array([0, 0,
-																		0, 1,
-																		1, 0,
-																		1, 1]),
-									gl.STATIC_DRAW);
-
-    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-    gl.enableVertexAttribArray(0);
-
-    const program = function() {
-        const vertex_shader_source = "attribute vec2 position;\n"
-            + "uniform mat4 transform;\n"
-				    + "uniform mat4 projection;\n"
-            + "void main()\n"
-            + "{\n"
-            + "  gl_Position = projection * transform * vec4(position, 0.0, 1.0);\n"
-            + "}\n";
-        const fragment_shader_source = "void main()\n"
-            + "{\n"
-            + "  gl_FragColor = vec4(70.0/255.0, 70.0/255.0, 70.0/255.0, 1.0);\n"
-            + "}\n";
-
-        const vertex_shader = create_shader(gl.VERTEX_SHADER, vertex_shader_source);
-        const fragment_shader = create_shader(gl.FRAGMENT_SHADER, fragment_shader_source);
-        const program = create_program(vertex_shader, fragment_shader);
-        gl.deleteShader(vertex_shader);
-        gl.deleteShader(fragment_shader);
-        return program;
-    }();
-
-    const transform = new Mat4(
-        [1, 0, 0, 0,
-				 0, 1, 0, 0,
-				 0, 0, 1, 0,
-				 0, 0, 0, 1]
-    );
-    const transform_loc = gl.getUniformLocation(program, "transform");
-
-    const projection = new Float32Array([
-        2.0 / (RIGHT - LEFT), 0, 0, 0,
-				0, 2.0 / (TOP - BOTTOM), 0, 0,
-				0, 0, 1, 0,
-				-1.0 * (RIGHT + LEFT) / (RIGHT - LEFT), -1.0 * (TOP + BOTTOM) / (TOP - BOTTOM), 0, 1, ]);
-    if (transform_loc === 0) {
-        alert("couldn't find uniform \"transform\"");
-    }
-		const projection_loc = gl.getUniformLocation(program, "projection");
-    if (projection_loc === 0)
-        alert("couldn't find uniform \"projection\"");
-
-		gl.useProgram(program);
-    gl.uniformMatrix4fv(projection_loc, false, projection);
+    let renderer = new Renderer(gl);
+    let game = new Game();
 
     gl.clearColor(73/255.0, 89/255.0, 81/255.0, 1.0);
 
@@ -303,34 +441,10 @@ function main()
 
 				if (i % 32 == 0)
         {
-						const segment = snake.body.first.data;
-            const head = segment.pos.copy0();
-            head.add(segment.dir);
-
-            if (head.equal(food))
-            {
-                snake.body.insert_first(new SnakeSegment(head, segment.dir.copy0()));
-                food = find_food_position(snake);
-            }
-            else
-            {
-                snake.move();
-            }
+            game.move();
         }
 
-				gl.useProgram(program);
-
-				for (let it = snake.body.first; it != null; it = it.next)
-				{
-						const segment = it.data;
-						transform.set2(3, segment.pos.x, segment.pos.y);
-						gl.uniformMatrix4fv(transform_loc, false, transform.data);
-						gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-				}
-
-        transform.set2(3, food.x, food.y);
-        gl.uniformMatrix4fv(transform_loc, false, transform.data);
-				gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        game.render(renderer);
 
 				i += 1;
 
