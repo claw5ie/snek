@@ -163,27 +163,47 @@ class Renderer {
         let uniforms = new Map<string, Uniform>();
 
         {
-            const data = new Float32Array([
-                0, 0,
-								0, 1,
-								1, 0,
-								1, 1
-            ]);
-            const buffer_size = data.length * 4;
-            const attribute = new VertexArrayAttribute(
-                0,
-                2,
-                gl.FLOAT,
-                false,
-                0,
-                0
-            );
+            {
+                const data = new Float32Array([
+                    0, 0,
+								    0, 1,
+								    1, 0,
+								    1, 1
+                ]);
+                const buffer_size = data.length * 4;
+                const attribute = new VertexArrayAttribute(
+                    0,
+                    2,
+                    gl.FLOAT,
+                    false,
+                    0,
+                    0
+                );
 
-            const buffer = gl.createBuffer();
-            gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-            gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
+                const buffer = gl.createBuffer();
+                gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+                gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
 
-            buffers[0] = new VertexArrayBuffer(buffer, buffer_size, [attribute]);
+                buffers[0] = new VertexArrayBuffer(buffer, buffer_size, [attribute]);
+            }
+
+            {
+                const buffer_size = 4 * 1024;
+                const attribute = new VertexArrayAttribute(
+                    0,
+                    2,
+                    gl.FLOAT,
+                    false,
+                    0,
+                    0
+                );
+
+                const buffer = gl.createBuffer();
+                gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+                gl.bufferData(gl.ARRAY_BUFFER, buffer_size, gl.DYNAMIC_DRAW);
+
+                buffers[1] = new VertexArrayBuffer(buffer, buffer_size, [attribute]);
+            }
         }
 
         {
@@ -275,13 +295,45 @@ class Renderer {
         data[4 * 3 + 1] = position.y;
 
         // TODO: remove magic number (buffer index == 0).
-        this.draw(0, this.gl.TRIANGLE_STRIP, 0, 4);
+        this.bind(0);
+        this.draw(this.gl.TRIANGLE_STRIP, 0, 4);
     }
 
-    draw(buffer_index: number, mode: number, start: number, count: number): void
+    draw_lines(points: Float32Array)
     {
-        this.bind(buffer_index);
+        if (points.length % 4 != 0) {
+            alert("expected 4 points per line (start.x, start.y, end.x, end.y)");
+            return;
+        }
 
+
+        // TODO: remove magic number (buffer index == 1).
+        const array_buffer = this.buffers[1];
+
+        if (array_buffer.buffer_size < points.length * 4)
+        {
+            alert("drawing too many lines");
+            return;
+        }
+
+        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, array_buffer.buffer);
+        this.gl.bufferSubData(this.gl.ARRAY_BUFFER, 0, points);
+
+        const uniform = this.uniforms.get("transform");
+
+        let data = uniform.matrix.data;
+        data[4 * 0 + 0] = 1;
+        data[4 * 1 + 1] = 1;
+        data[4 * 3 + 0] = 0;
+        data[4 * 3 + 1] = 0;
+
+        this.bind(1);
+        this.draw(this.gl.LINES, 0, points.length / 2);
+    }
+
+    // NOTE: need to bind desired vertex buffer before calling.
+    draw(mode: number, start: number, count: number): void
+    {
         this.gl.useProgram(this.program);
         for (const [_, info] of this.uniforms)
         {
@@ -356,12 +408,11 @@ class Snake {
 class Game {
     snake: Snake;
     food_position: Vec2;
+    grid: Float32Array;
 
     constructor() {
-        this.snake = new Snake();
-        this.food_position = this.find_food_position();
-
-        const snake = this.snake;
+        const snake = new Snake();
+        let grid: Float32Array = null;
 
         document.addEventListener('keydown', function(event) {
             const segment = snake.body.first.data;
@@ -386,10 +437,47 @@ class Game {
                 } break;
             }
         });
+
+        {
+            const xn = (RIGHT - LEFT) + 1;
+            const yn = (TOP - BOTTOM) + 1;
+
+            const xoffset = (RIGHT - LEFT) / (xn - 1);
+            const yoffset = (TOP - BOTTOM) / (yn - 1);
+
+            grid = new Float32Array((xn + yn) * 4);
+
+            let point_count = 0;
+
+            for (let i = 0; i < xn; i++)
+            {
+                const x = LEFT + i * xoffset;
+                grid[point_count + 0] = x;
+                grid[point_count + 1] = BOTTOM;
+                grid[point_count + 2] = x;
+                grid[point_count + 3] = TOP;
+                point_count += 4;
+            }
+
+            for (let i = 0; i < yn; i++)
+            {
+                const y = BOTTOM + i * yoffset;
+                grid[point_count + 0] = LEFT;
+                grid[point_count + 1] = y;
+                grid[point_count + 2] = RIGHT;
+                grid[point_count + 3] = y;
+                point_count += 4;
+            }
+        }
+
+        this.snake = snake;
+        this.food_position = this.find_food_position();
+        this.grid = grid;
     }
 
     find_food_position(): Vec2
     {
+        // TODO: explicitly define by how much to partition on x and y diretion.
         const free_block_count = (RIGHT - LEFT) * (TOP - BOTTOM) - this.snake.body.count;
 
         let index = rand_range(0, free_block_count);
@@ -429,6 +517,8 @@ class Game {
 
     render(renderer: Renderer): void
     {
+        renderer.draw_lines(this.grid);
+
         for (let it = this.snake.body.first; it != null; it = it.next)
 				{
             const segment = it.data;
