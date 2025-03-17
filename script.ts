@@ -138,35 +138,55 @@ const RIGHT = 8;
 const BOTTOM = -6;
 const TOP = 6;
 
+class VertexArrayBuffer {
+    buffer: WebGLBuffer;
+    buffer_size: number;
+    attributes: VertexArrayAttribute[];
+
+    constructor(buffer: WebGLBuffer, buffer_size: number, attributes: VertexArrayAttribute[]) {
+        this.buffer = buffer;
+        this.buffer_size = buffer_size;
+        this.attributes = attributes;
+    }
+};
+
 class Renderer {
     gl: WebGLRenderingContext;
-    buffer: WebGLBuffer;
-    attributes: VertexArrayAttribute[];
+    buffers: VertexArrayBuffer[];
     program: WebGLProgram;
     uniforms: Map<string, Uniform>;
 
     constructor(gl: WebGLRenderingContext)
     {
-        const buffer = gl.createBuffer();
+        let buffers: VertexArrayBuffer[] = [null, null];
+        let program: WebGLProgram = null;
+        let uniforms = new Map<string, Uniform>();
 
-        gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-        gl.bufferData(gl.ARRAY_BUFFER,
-									    new Float32Array([0, 0,
-																		    0, 1,
-																		    1, 0,
-																		    1, 1]),
-									    gl.STATIC_DRAW);
+        {
+            const data = new Float32Array([
+                0, 0,
+								0, 1,
+								1, 0,
+								1, 1
+            ]);
+            const buffer_size = data.length * 4;
+            const attribute = new VertexArrayAttribute(
+                0,
+                2,
+                gl.FLOAT,
+                false,
+                0,
+                0
+            );
 
-        const attribute = new VertexArrayAttribute(
-            0,
-            2,
-            gl.FLOAT,
-            false,
-            0,
-            0
-        );
+            const buffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+            gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
 
-        const program = function(gh: WebGLRenderingContext) {
+            buffers[0] = new VertexArrayBuffer(buffer, buffer_size, [attribute]);
+        }
+
+        {
             const vertex_shader_source = "attribute vec2 position;\n"
                 + "uniform mat4 transform;\n"
 				        + "uniform mat4 projection;\n"
@@ -181,54 +201,57 @@ class Renderer {
 
             const vertex_shader = create_shader(gl, gl.VERTEX_SHADER, vertex_shader_source);
             const fragment_shader = create_shader(gl, gl.FRAGMENT_SHADER, fragment_shader_source);
-            const program = create_program(gl, vertex_shader, fragment_shader);
+            program = create_program(gl, vertex_shader, fragment_shader);
+
             gl.deleteShader(vertex_shader);
             gl.deleteShader(fragment_shader);
-            return program;
-        }(this.gl);
+        }
 
-        const transform_uniform_name = "transform";
-        const projection_uniform_name = "projection";
+        {
+            gl.useProgram(program);
 
-        gl.useProgram(program);
-        const transform_loc = gl.getUniformLocation(program, transform_uniform_name);
-        const projection_loc = gl.getUniformLocation(program, projection_uniform_name);
+            const transform_uniform_name = "transform";
+            const projection_uniform_name = "projection";
 
-        if (transform_loc === 0)
-            alert("couldn't find uniform \"transform\"");
+            const transform_loc = gl.getUniformLocation(program, transform_uniform_name);
+            const projection_loc = gl.getUniformLocation(program, projection_uniform_name);
 
-        if (projection_loc === 0)
-            alert("couldn't find uniform \"projection\"");
+            if (transform_loc === 0)
+                alert("couldn't find uniform \"" + transform_uniform_name + "\"");
 
-        const transform_matrix = new Mat4([
-            1, 0, 0, 0,
-				    0, 1, 0, 0,
-				    0, 0, 1, 0,
-				    0, 0, 0, 1,
-        ]);
-        const projection_matrix = new Mat4([
-            2.0 / (RIGHT - LEFT), 0, 0, 0,
-				    0, 2.0 / (TOP - BOTTOM), 0, 0,
-				    0, 0, 1, 0,
-				    (-1.0) * (RIGHT + LEFT) / (RIGHT - LEFT), (-1.0) * (TOP + BOTTOM) / (TOP - BOTTOM), 0, 1,
-        ]);
+            if (projection_loc === 0)
+                alert("couldn't find uniform \"" + projection_uniform_name + "\"");
 
-        const uniforms = new Map<string, Uniform>([
-            [transform_uniform_name, new Uniform(transform_loc, transform_matrix)],
-            [projection_uniform_name, new Uniform(projection_loc, projection_matrix)],
-        ]);
+            const transform_matrix = new Mat4([
+                1, 0, 0, 0,
+				        0, 1, 0, 0,
+				        0, 0, 1, 0,
+				        0, 0, 0, 1,
+            ]);
+
+            const projection_matrix = new Mat4([
+                2.0 / (RIGHT - LEFT), 0, 0, 0,
+				        0, 2.0 / (TOP - BOTTOM), 0, 0,
+				        0, 0, 1, 0,
+				        (-1.0) * (RIGHT + LEFT) / (RIGHT - LEFT), (-1.0) * (TOP + BOTTOM) / (TOP - BOTTOM), 0, 1,
+            ]);
+
+            uniforms.set(transform_uniform_name, new Uniform(transform_loc, transform_matrix));
+            uniforms.set(projection_uniform_name, new Uniform(projection_loc, projection_matrix));
+        }
 
         this.gl = gl;
-        this.buffer = buffer;
-        this.attributes = [attribute];
+        this.buffers = buffers;
         this.program = program;
         this.uniforms = uniforms;
     }
 
-    bind(): void
+    bind(buffer_index: number): void
     {
-        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.buffer);
-        for (const attribute of this.attributes)
+        const array_buffer = this.buffers[buffer_index];
+
+        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, array_buffer.buffer);
+        for (const attribute of array_buffer.attributes)
         {
             this.gl.vertexAttribPointer(
                 attribute.location,
@@ -251,12 +274,13 @@ class Renderer {
         data[4 * 3 + 0] = position.x;
         data[4 * 3 + 1] = position.y;
 
-        this.draw(this.gl.TRIANGLE_STRIP, 0, 4);
+        // TODO: remove magic number (buffer index == 0).
+        this.draw(0, this.gl.TRIANGLE_STRIP, 0, 4);
     }
 
-    draw(mode: number, start: number, count: number): void
+    draw(buffer_index: number, mode: number, start: number, count: number): void
     {
-        this.bind();
+        this.bind(buffer_index);
 
         this.gl.useProgram(this.program);
         for (const [_, info] of this.uniforms)
