@@ -130,6 +130,11 @@ const red_color = new Vec4(1, 0, 0, 1.0);
 const green_color = new Vec4(0, 1, 0, 1.0);
 const dark_red_color = new Vec4(0x89/255.0, 0x01/255.0, 0x04/255.0, 1.0);
 
+const unit_down_vec2 = new Vec2(0, -1);
+const unit_up_vec2 = new Vec2(0, 1);
+const unit_left_vec2 = new Vec2(-1, 0);
+const unit_right_vec2 = new Vec2(1, 0);
+
 class VertexArrayAttribute {
     location: number;
     components: number;
@@ -750,26 +755,32 @@ function main(): void
     const game = new Game(4, 3);
 
     document.addEventListener('keydown', function(event) {
-        const segment = game.snake.body.first!.data;
+        let head = game.snake.body.first;
+        let after_head = head!.next;
+
+        if (!after_head) {
+            return;
+        }
+
+        const head_segment = head!.data;
+        const head_position = head_segment.position.copy();
+
+        const after_head_segment = after_head.data;
+
+        const set_direction = function(direction: Vec2): void {
+            head_position.add(direction);
+
+            if (!head_position.equal(after_head_segment.position)) {
+                head_segment.direction.copy_from_vec2(direction);
+            }
+        };
 
         switch (event.key)
         {
-            case "s": {
-                if (!segment.direction.equal(new Vec2(0, 1)))
-                    segment.direction.put(0, -1);
-            } break;
-            case "w": {
-                if (!segment.direction.equal(new Vec2(0, -1)))
-                    segment.direction.put(0, 1);
-            } break;
-            case "a": {
-                if (!segment.direction.equal(new Vec2(1, 0)))
-                    segment.direction.put(-1, 0);
-            } break;
-            case "d": {
-                if (!segment.direction.equal(new Vec2(-1, 0)))
-                    segment.direction.put(1, 0);
-            } break;
+            case "s": set_direction(unit_down_vec2);  break;
+            case "w": set_direction(unit_up_vec2);    break;
+            case "a": set_direction(unit_left_vec2);  break;
+            case "d": set_direction(unit_right_vec2); break;
             case "r": {
                 const new_game = new Game(game.x_slices, game.y_slices);
                 game.snake = new_game.snake;
