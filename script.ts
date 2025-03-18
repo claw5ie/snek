@@ -159,7 +159,7 @@ class Renderer {
     constructor(gl: WebGLRenderingContext)
     {
         const buffers = function(): VertexArrayBuffer[] {
-            let buffer0 = function() {
+            const buffer0 = function() {
                 const data = new Float32Array([
                     0, 0,
                     0, 1,
@@ -183,7 +183,7 @@ class Renderer {
                 return new VertexArrayBuffer(buffer, buffer_size, [attribute]);
             }();
 
-            let buffer1 = function() {
+            const buffer1 = function() {
                 const buffer_size = 4 * 1024;
                 const attribute = new VertexArrayAttribute(
                     0,
@@ -391,12 +391,12 @@ class Snake {
         {
             let node = it!;
 
-            let segment = node.data;
+            const segment = node.data;
             segment.position.add(segment.direction);
             segment.direction.copy_from_vec2(node.previous!.data.direction);
         }
 
-        let segment = it!.data;
+        const segment = it!.data;
         segment.position.add(segment.direction);
     }
 
@@ -430,10 +430,7 @@ class Game {
 
     grid: Float32Array;
 
-    constructor() {
-        const x_slices = 8;
-        const y_slices = 6;
-
+    constructor(x_slices: number, y_slices: number) {
         const snake = new Snake();
 
         document.addEventListener('keydown', function(event) {
@@ -510,17 +507,17 @@ class Game {
             return null;
         }
 
-        let free_block_index = rand_range(0, free_block_count);
+        let free_blocks_to_skip = rand_range(0, free_block_count);
         for (const position = new Vec2(0, 0); position.y < this.y_slices; position.y++)
         {
             for (position.x = 0; position.x < this.x_slices; position.x++)
             {
                 if (!this.snake.is_position_occupied(position))
                 {
-                    if (free_block_index == 0) {
+                    if (free_blocks_to_skip == 0) {
                         return position;
                     }
-                    free_block_index--;
+                    free_blocks_to_skip--;
                 }
             }
         }
@@ -621,7 +618,7 @@ function main(): void
         return new Renderer(gl!);
     }();
 
-    const game = new Game();
+    const game = new Game(4, 3);
 
     renderer.gl.clearColor(73/255.0, 89/255.0, 81/255.0, 1.0);
 
@@ -631,7 +628,8 @@ function main(): void
     {
         renderer.gl.clear(renderer.gl.COLOR_BUFFER_BIT);
 
-        switch (game.status) {
+        switch (game.status)
+        {
             case GameStatus.Going: {
                 if (i % 32 == 0) {
                     game.move();
