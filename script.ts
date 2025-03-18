@@ -378,9 +378,9 @@ class Snake {
     constructor()
     {
         this.body = new DoublyLinkedList<SnakeSegment>([
-            new SnakeSegment(new Vec2(0, 0), new Vec2(-1, 0)),
-            new SnakeSegment(new Vec2(1, 0), new Vec2(-1, 0)),
-            new SnakeSegment(new Vec2(2, 0), new Vec2(-1, 0)),
+            new SnakeSegment(new Vec2(2, 0), new Vec2(1, 0)),
+            new SnakeSegment(new Vec2(1, 0), new Vec2(1, 0)),
+            new SnakeSegment(new Vec2(0, 0), new Vec2(1, 0)),
         ]);
     }
 
@@ -412,6 +412,8 @@ class Snake {
     }
 };
 
+type Food = Vec2;
+
 enum GameStatus {
     Going,
     Lost,
@@ -419,12 +421,19 @@ enum GameStatus {
 };
 
 class Game {
+    x_slices: number;
+    y_slices: number;
+
     snake: Snake;
-    food_position: Vec2;
-    grid: Float32Array;
+    food: Food;
     status: GameStatus;
 
+    grid: Float32Array;
+
     constructor() {
+        const x_slices = 8;
+        const y_slices = 6;
+
         const snake = new Snake();
 
         document.addEventListener('keydown', function(event) {
@@ -452,19 +461,19 @@ class Game {
         });
 
         const grid = function(): Float32Array {
-            const xn = (RIGHT - LEFT) + 1;
-            const yn = (TOP - BOTTOM) + 1;
+            const x_line_count = x_slices + 1;
+            const y_line_count = y_slices + 1;
 
-            const xoffset = (RIGHT - LEFT) / (xn - 1);
-            const yoffset = (TOP - BOTTOM) / (yn - 1);
+            const x_offset = (RIGHT - LEFT) / (x_line_count - 1);
+            const y_offset = (TOP - BOTTOM) / (y_line_count - 1);
 
-            const grid = new Float32Array((xn + yn) * 4);
+            const grid = new Float32Array((x_line_count + y_line_count) * 4);
 
             let point_count = 0;
 
-            for (let i = 0; i < xn; i++)
+            for (let i = 0; i < x_line_count; i++)
             {
-                const x = LEFT + i * xoffset;
+                const x = LEFT + i * x_offset;
                 grid[point_count + 0] = x;
                 grid[point_count + 1] = BOTTOM;
                 grid[point_count + 2] = x;
@@ -472,9 +481,9 @@ class Game {
                 point_count += 4;
             }
 
-            for (let i = 0; i < yn; i++)
+            for (let i = 0; i < y_line_count; i++)
             {
-                const y = BOTTOM + i * yoffset;
+                const y = BOTTOM + i * y_offset;
                 grid[point_count + 0] = LEFT;
                 grid[point_count + 1] = y;
                 grid[point_count + 2] = RIGHT;
@@ -485,31 +494,38 @@ class Game {
             return grid;
         }();
 
+        this.x_slices = x_slices;
+        this.y_slices = y_slices;
         this.snake = snake;
-        this.food_position = this.find_food_position()!;
-        this.grid = grid;
+        this.food = this.find_food_position()!;
         this.status = GameStatus.Going;
+        this.grid = grid;
     }
 
     find_food_position(): Vec2 | null
     {
-        // TODO: explicitly define by how much to partition on x and y diretion.
-        const free_block_count = (RIGHT - LEFT) * (TOP - BOTTOM) - this.snake.body.count;
+        const free_block_count = this.x_slices * this.y_slices - this.snake.body.count;
 
-        let index = rand_range(0, free_block_count);
-        for (const pos = new Vec2(LEFT, BOTTOM); pos.y < TOP; pos.y++)
+        if (free_block_count == 0) {
+            return null;
+        }
+
+        let free_block_index = rand_range(0, free_block_count);
+        for (const position = new Vec2(0, 0); position.y < this.y_slices; position.y++)
         {
-            for (pos.x = LEFT; pos.x < RIGHT; pos.x++)
+            for (position.x = 0; position.x < this.x_slices; position.x++)
             {
-                if (!this.snake.is_position_occupied(pos))
+                if (!this.snake.is_position_occupied(position))
                 {
-                    if (index == 0)
-                        return pos;
-                    index--;
+                    if (free_block_index == 0) {
+                        return position;
+                    }
+                    free_block_index--;
                 }
             }
         }
 
+        // unreachable.
         return null;
     }
 
@@ -520,14 +536,14 @@ class Game {
 
         head.add(segment.direction);
 
-        if (head.equal(this.food_position))
+        if (head.equal(this.food))
         {
             this.snake.body.insert_first(new SnakeSegment(head, segment.direction.copy()));
 
-            const new_food_position = this.find_food_position();
+            const new_food = this.find_food_position();
 
-            if (new_food_position) {
-                this.food_position = new_food_position!;
+            if (new_food) {
+                this.food = new_food!;
             } else {
                 this.status = GameStatus.Won;
             }
@@ -556,23 +572,37 @@ class Game {
             }
         }
 
-        return (head_segment.position.x < LEFT
-            || head_segment.position.x >= RIGHT // NOTE: Rectangle is centered at left corner. TODO: replace position by an index on the grid.
-            || head_segment.position.y < BOTTOM
-            || head_segment.position.y >= TOP); // NOTE: Rectangle is centered at bottom corner.
+        return (head_segment.position.x < 0
+            || head_segment.position.x >= this.x_slices
+            || head_segment.position.y < 0
+            || head_segment.position.y >= this.y_slices);
     }
 
     render(renderer: Renderer): void
     {
+        const x_scale = (RIGHT - LEFT) / this.x_slices;
+        const y_scale = (TOP - BOTTOM) / this.y_slices;
+
         renderer.draw_lines(this.grid);
 
         for (let it = this.snake.body.first; it != null; it = it.next)
         {
             const segment = it.data;
-            renderer.draw_rect(segment.position, 1, 1);
+            const position = segment.position.copy();
+            position.x *= x_scale;
+            position.x += LEFT;
+            position.y *= y_scale;
+            position.y += BOTTOM;
+            renderer.draw_rect(position, x_scale, y_scale);
         }
 
-        renderer.draw_rect(this.food_position, 1, 1);
+        const position = this.food.copy();
+        position.x *= x_scale;
+        position.x += LEFT;
+        position.y *= y_scale;
+        position.y += BOTTOM;
+
+        renderer.draw_rect(position, x_scale, y_scale);
     }
 };
 
