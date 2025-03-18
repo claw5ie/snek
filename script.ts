@@ -588,19 +588,19 @@ class Game {
             const segment = it.data;
             const position = segment.position.copy();
             position.x *= x_scale;
-            position.x += LEFT;
+            position.x += LEFT + x_scale * 0.01;
             position.y *= y_scale;
-            position.y += BOTTOM;
-            renderer.draw_rect(position, x_scale, y_scale);
+            position.y += BOTTOM + y_scale * 0.01;
+            renderer.draw_rect(position, x_scale * 0.98, y_scale * 0.98);
         }
 
         const position = this.food.copy();
         position.x *= x_scale;
-        position.x += LEFT;
+        position.x += LEFT + x_scale / 4;
         position.y *= y_scale;
-        position.y += BOTTOM;
+        position.y += BOTTOM + y_scale / 4;
 
-        renderer.draw_rect(position, x_scale, y_scale);
+        renderer.draw_rect(position, x_scale / 2, y_scale / 2);
     }
 };
 
