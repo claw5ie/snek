@@ -99,6 +99,37 @@ class Vec2 {
     }
 };
 
+class Vec4 {
+    x: number;
+    y: number;
+    z: number;
+    w: number;
+
+    constructor(x: number,
+                y: number,
+                z: number,
+                w: number)
+    {
+        this.x = x;
+        this.y = y;
+        this.z = z;
+        this.w = w;
+    }
+
+    copy_from_vec4(vector: Vec4): void
+    {
+        this.x = vector.x;
+        this.y = vector.y;
+        this.z = vector.z;
+        this.w = vector.w;
+    }
+};
+
+const default_color = new Vec4(70.0/255.0, 70.0/255.0, 70.0/255.0, 1.0);
+const red_color = new Vec4(1, 0, 0, 1.0);
+const green_color = new Vec4(0, 1, 0, 1.0);
+const dark_red_color = new Vec4(0x89/255.0, 0x01/255.0, 0x04/255.0, 1.0);
+
 class VertexArrayAttribute {
     location: number;
     components: number;
@@ -122,14 +153,36 @@ class VertexArrayAttribute {
     }
 };
 
-class Uniform {
-    location: WebGLUniformLocation;
+class UniformMat4 {
+    tag: "matrix";
     matrix: Mat4;
 
+    constructor(matrix: Mat4) {
+        this.tag = "matrix";
+        this.matrix = matrix;
+    }
+};
+
+class UniformVec4 {
+    tag: "vector";
+    vector: Vec4;
+
+    constructor(vector: Vec4) {
+        this.tag = "vector";
+        this.vector = vector;
+    }
+};
+
+type UniformData = UniformMat4 | UniformVec4;
+
+class Uniform {
+    location: WebGLUniformLocation;
+    data: UniformData;
+
     constructor(location: WebGLUniformLocation,
-                matrix: Mat4) {
+                data: UniformData) {
         this.location = location;
-        this.matrix   = matrix;
+        this.data     = data;
     }
 };
 
@@ -212,9 +265,11 @@ class Renderer {
                 + "{\n"
                 + "  gl_Position = projection * transform * vec4(position, 0.0, 1.0);\n"
                 + "}\n";
-            const fragment_shader_source = "void main()\n"
+            const fragment_shader_source = "precision highp float;\n"
+                + "uniform vec4 color;\n"
+                + "void main()\n"
                 + "{\n"
-                + "  gl_FragColor = vec4(70.0/255.0, 70.0/255.0, 70.0/255.0, 1.0);\n"
+                + "  gl_FragColor = color;\n"
                 + "}\n";
 
             const vertex_shader = create_shader(gl, gl.VERTEX_SHADER, vertex_shader_source);
@@ -232,15 +287,20 @@ class Renderer {
 
             const transform_uniform_name = "transform";
             const projection_uniform_name = "projection";
+            const color_uniform_name = "color";
 
             const transform_loc = gl.getUniformLocation(program, transform_uniform_name);
             const projection_loc = gl.getUniformLocation(program, projection_uniform_name);
+            const color_loc = gl.getUniformLocation(program, color_uniform_name);
 
             if (!transform_loc)
                 alert("couldn't find uniform \"" + transform_uniform_name + "\"");
 
             if (!projection_loc)
                 alert("couldn't find uniform \"" + projection_uniform_name + "\"");
+
+            if (!color_loc)
+                alert("couldn't find uniform \"" + color_uniform_name + "\"");
 
             const transform_matrix = new Mat4([
                 1, 0, 0, 0,
@@ -256,9 +316,12 @@ class Renderer {
                 (-1.0) * (RIGHT + LEFT) / (RIGHT - LEFT), (-1.0) * (TOP + BOTTOM) / (TOP - BOTTOM), 0, 1,
             ]);
 
+            const color = new Vec4(0, 0, 0, 1);
+
             return new Map<string, Uniform>([
-                [transform_uniform_name, new Uniform(transform_loc!, transform_matrix)],
-                [projection_uniform_name, new Uniform(projection_loc!, projection_matrix)]
+                [transform_uniform_name, new Uniform(transform_loc!, new UniformMat4(transform_matrix))],
+                [projection_uniform_name, new Uniform(projection_loc!, new UniformMat4(projection_matrix))],
+                [color_uniform_name, new Uniform(color_loc!, new UniformVec4(color))],
             ]);
         }();
 
@@ -286,16 +349,39 @@ class Renderer {
         }
     }
 
-    draw_rect(position: Vec2, width: number, height: number): void
+    draw_rect(position: Vec2, color: Vec4, width: number, height: number): void
     {
-        const uniform = this.uniforms.get("transform");
+        {
+            const uniform = this.uniforms.get("transform");
 
-        if (uniform) { // Why can it be undefined?
-            let data = uniform.matrix.data;
-            data[4 * 0 + 0] = width;
-            data[4 * 1 + 1] = height;
-            data[4 * 3 + 0] = position.x;
-            data[4 * 3 + 1] = position.y;
+            if (uniform) // Why can it be undefined?
+            {
+                switch (uniform.data.tag)
+                {
+                    case "matrix": {
+                        const matrix: Mat4 = uniform.data.matrix;
+                        matrix.data[4 * 0 + 0] = width;
+                        matrix.data[4 * 1 + 1] = height;
+                        matrix.data[4 * 3 + 0] = position.x;
+                        matrix.data[4 * 3 + 1] = position.y;
+                    } break;
+                }
+            }
+        }
+
+        {
+            const uniform = this.uniforms.get("color");
+
+            if (uniform) // Why can it be undefined?
+            {
+                switch (uniform.data.tag)
+                {
+                    case "vector": {
+                        const vector: Vec4 = uniform.data.vector;
+                        vector.copy_from_vec4(color);
+                    } break;
+                }
+            }
         }
 
         // TODO: remove magic number (buffer index == 0).
@@ -303,7 +389,16 @@ class Renderer {
         this.draw(this.gl.TRIANGLE_STRIP, 0, 4);
     }
 
-    draw_lines(points: Float32Array)
+    draw_rect_centered(position: Vec2, color: Vec4, width: number, height: number, scale: number): void
+    {
+        const _position = position.copy();
+        const half_inverse_scale = (1.0 - scale) / 2;
+        _position.x += width * half_inverse_scale;
+        _position.y += height * half_inverse_scale;
+        this.draw_rect(_position, color, width * scale, height * scale);
+    }
+
+    draw_lines(color: Vec4, points: Float32Array)
     {
         if (points.length % 4 != 0) {
             alert("expected 4 points per line (start.x, start.y, end.x, end.y)");
@@ -323,14 +418,37 @@ class Renderer {
         this.gl.bindBuffer(this.gl.ARRAY_BUFFER, array_buffer.buffer);
         this.gl.bufferSubData(this.gl.ARRAY_BUFFER, 0, points);
 
-        const uniform = this.uniforms.get("transform");
+        {
+            const uniform = this.uniforms.get("transform");
 
-        if (uniform) { // Why can it be undefined?
-            let data = uniform.matrix.data;
-            data[4 * 0 + 0] = 1;
-            data[4 * 1 + 1] = 1;
-            data[4 * 3 + 0] = 0;
-            data[4 * 3 + 1] = 0;
+            if (uniform) // Why can it be undefined?
+            {
+                switch (uniform.data.tag)
+                {
+                    case "matrix": {
+                        const matrix: Mat4 = uniform.data.matrix;
+                        matrix.data[4 * 0 + 0] = 1;
+                        matrix.data[4 * 1 + 1] = 1;
+                        matrix.data[4 * 3 + 0] = 0;
+                        matrix.data[4 * 3 + 1] = 0;
+                    } break;
+                }
+            }
+        }
+
+        {
+            const uniform = this.uniforms.get("color");
+
+            if (uniform) // Why can it be undefined?
+            {
+                switch (uniform.data.tag)
+                {
+                    case "vector": {
+                        const vector: Vec4 = uniform.data.vector;
+                        vector.copy_from_vec4(color);
+                    } break;
+                }
+            }
         }
 
         this.bind(1);
@@ -341,9 +459,20 @@ class Renderer {
     draw(mode: number, start: number, count: number): void
     {
         this.gl.useProgram(this.program);
-        for (const [_, info] of this.uniforms)
+        for (const [_, uniform] of this.uniforms)
         {
-            this.gl.uniformMatrix4fv(info.location, false, info.matrix.data);
+            switch (uniform.data.tag)
+            {
+                case "matrix": {
+                    const matrix: Mat4 = uniform.data.matrix;
+                    this.gl.uniformMatrix4fv(uniform.location, false, matrix.data);
+                } break;
+                case "vector": {
+                    const vector: Vec4 = uniform.data.vector;
+                    this.gl.uniform4f(uniform.location, vector.x, vector.y, vector.z, vector.w);
+                } break;
+            }
+
         }
 
         this.gl.drawArrays(mode, start, count);
@@ -416,8 +545,8 @@ type Food = Vec2;
 
 enum GameStatus {
     Going,
-    Lost,
-    Won,
+    Defeat,
+    Victory,
 };
 
 class Game {
@@ -432,30 +561,6 @@ class Game {
 
     constructor(x_slices: number, y_slices: number) {
         const snake = new Snake();
-
-        document.addEventListener('keydown', function(event) {
-            const segment = snake.body.first!.data;
-
-            switch (event.key)
-            {
-                case "s": {
-                    if (!segment.direction.equal(new Vec2(0, 1)))
-                        segment.direction.put(0, -1);
-                } break;
-                case "w": {
-                    if (!segment.direction.equal(new Vec2(0, -1)))
-                        segment.direction.put(0, 1);
-                } break;
-                case "a": {
-                    if (!segment.direction.equal(new Vec2(1, 0)))
-                        segment.direction.put(-1, 0);
-                } break;
-                case "d": {
-                    if (!segment.direction.equal(new Vec2(-1, 0)))
-                        segment.direction.put(1, 0);
-                } break;
-            }
-        });
 
         const grid = function(): Float32Array {
             const x_line_count = x_slices + 1;
@@ -560,7 +665,7 @@ class Game {
             if (new_food) {
                 this.food = new_food!;
             } else {
-                this.status = GameStatus.Won;
+                this.status = GameStatus.Victory;
             }
         }
         else
@@ -568,40 +673,64 @@ class Game {
             if (this.is_valid_head_position(head)) {
                 this.snake.move();
             } else {
-                this.status = GameStatus.Lost;
+                this.status = GameStatus.Defeat;
             }
         }
     }
 
     render(renderer: Renderer): void
     {
-        const x_scale = (RIGHT - LEFT) / this.x_slices;
-        const y_scale = (TOP - BOTTOM) / this.y_slices;
+        let body_color = default_color;
 
-        renderer.draw_lines(this.grid);
+        switch (this.status)
+        {
+            case GameStatus.Going: break;
+            case GameStatus.Defeat: {
+                body_color = red_color;
+            } break;
+            case GameStatus.Victory: {
+                body_color = green_color;
+            } break;
+        }
+
+        const width = (RIGHT - LEFT) / this.x_slices;
+        const height = (TOP - BOTTOM) / this.y_slices;
+
+        const to_local_coordinated = function(position: Vec2): Vec2 {
+            const p = position.copy();
+            p.x *= width;
+            p.x += LEFT;
+            p.y *= height;
+            p.y += BOTTOM;
+            return p;
+        };
+
+        renderer.draw_lines(default_color, this.grid);
 
         for (let it = this.snake.body.first; it != null; it = it.next)
         {
             const segment = it.data;
             const position = segment.position.copy();
-            position.x *= x_scale;
-            position.x += LEFT + x_scale * 0.01;
-            position.y *= y_scale;
-            position.y += BOTTOM + y_scale * 0.01;
-            renderer.draw_rect(position, x_scale * 0.98, y_scale * 0.98);
+            const actual_position = to_local_coordinated(position);
+            renderer.draw_rect_centered(actual_position, body_color, width, height, 0.98);
         }
 
-        const position = this.food.copy();
-        position.x *= x_scale;
-        position.x += LEFT + x_scale / 4;
-        position.y *= y_scale;
-        position.y += BOTTOM + y_scale / 4;
-
-        renderer.draw_rect(position, x_scale / 2, y_scale / 2);
+        switch (this.status)
+        {
+            case GameStatus.Going:
+            case GameStatus.Defeat: {
+                const position = this.food;
+                const actual_position = to_local_coordinated(position);
+                renderer.draw_rect_centered(actual_position, dark_red_color, width, height, 0.5);
+            } break;
+            case GameStatus.Victory: break;
+        }
     }
 };
 
 main();
+
+var ticks: number = 0;
 
 function main(): void
 {
@@ -620,9 +749,38 @@ function main(): void
 
     const game = new Game(4, 3);
 
-    renderer.gl.clearColor(73/255.0, 89/255.0, 81/255.0, 1.0);
+    document.addEventListener('keydown', function(event) {
+        const segment = game.snake.body.first!.data;
 
-    let i = 0;
+        switch (event.key)
+        {
+            case "s": {
+                if (!segment.direction.equal(new Vec2(0, 1)))
+                    segment.direction.put(0, -1);
+            } break;
+            case "w": {
+                if (!segment.direction.equal(new Vec2(0, -1)))
+                    segment.direction.put(0, 1);
+            } break;
+            case "a": {
+                if (!segment.direction.equal(new Vec2(1, 0)))
+                    segment.direction.put(-1, 0);
+            } break;
+            case "d": {
+                if (!segment.direction.equal(new Vec2(-1, 0)))
+                    segment.direction.put(1, 0);
+            } break;
+            case "r": {
+                const new_game = new Game(game.x_slices, game.y_slices);
+                game.snake = new_game.snake;
+                game.food = new_game.food;
+                game.status = new_game.status;
+                ticks = 0;
+            } break;
+        }
+    });
+
+    renderer.gl.clearColor(73/255.0, 89/255.0, 81/255.0, 1.0);
 
     function go()
     {
@@ -631,23 +789,29 @@ function main(): void
         switch (game.status)
         {
             case GameStatus.Going: {
-                if (i % 32 == 0) {
+                if (ticks % 32 == 0) {
                     game.move();
                 }
             } break;
-            case GameStatus.Lost:
-            case GameStatus.Won:
-                break;
+            case GameStatus.Defeat:
+            case GameStatus.Victory: break;
         }
 
         game.render(renderer);
 
-        i += 1;
+        ticks += 1;
 
         window.requestAnimationFrame(go);
     }
 
     go();
+}
+
+function debug_print(message: string): void
+{
+    if (ticks % 32 == 0) {
+        console.log(message);
+    }
 }
 
 function create_shader(gl: WebGLRenderingContext, type: number, source: string): WebGLShader
@@ -690,7 +854,5 @@ function create_program(gl: WebGLRenderingContext, vertex_shader: WebGLShader, f
 
 function rand_range(min: number, max: number): number
 {
-    min = Math.ceil(min);
-    max = Math.floor(max);
-    return Math.floor(Math.random() * (max - min + 1) + min);
+    return Math.floor(Math.random() * (max - min) + min);
 }
