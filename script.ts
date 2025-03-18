@@ -397,8 +397,9 @@ class Snake {
         let it = this.body.first;
 				while (it != null)
 				{
-            if (it.data.position.equal(position))
+            if (it.data.position.equal(position)) {
                 return true;
+            }
             it = it.next;
 				}
         return false;
@@ -409,6 +410,7 @@ class Game {
     snake: Snake;
     food_position: Vec2;
     grid: Float32Array;
+    lost: boolean;
 
     constructor() {
         const snake = new Snake();
@@ -473,6 +475,7 @@ class Game {
         this.snake = snake;
         this.food_position = this.find_food_position();
         this.grid = grid;
+        this.lost = false;
     }
 
     find_food_position(): Vec2
@@ -512,7 +515,29 @@ class Game {
         else
         {
             this.snake.move();
+            if (this.check_colisions()) {
+                this.lost = true;
+            }
         }
+    }
+
+    check_colisions(): boolean
+    {
+        let it = this.snake.body.first;
+
+        const head_segment = it.data;
+
+        for (it = it.next; it != null; it = it.next)
+        {
+            if (it.data.position.equal(head_segment.position)) {
+                return true;
+            }
+        }
+
+        return (head_segment.position.x < LEFT
+            || head_segment.position.x >= RIGHT // NOTE: Rectangle is centered at left corner. TODO: replace position by an index on the grid.
+            || head_segment.position.y < BOTTOM
+            || head_segment.position.y >= TOP); // NOTE: Rectangle is centered at bottom corner.
     }
 
     render(renderer: Renderer): void
@@ -555,9 +580,11 @@ function main(): void
     {
         renderer.gl.clear(renderer.gl.COLOR_BUFFER_BIT);
 
-				if (i % 32 == 0)
+        if (!game.lost)
         {
-            game.move();
+				    if (i % 32 == 0) {
+                game.move();
+            }
         }
 
         game.render(renderer);
