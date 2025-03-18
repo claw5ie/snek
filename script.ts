@@ -529,6 +529,24 @@ class Game {
         return null;
     }
 
+    is_valid_head_position(head_position: Vec2): boolean {
+        let it = this.snake.body.first;
+        let node = it!;
+
+        for (it = node.next; it != null; it = node.next)
+        {
+            node = it!;
+            if (node.data.position.equal(head_position)) {
+                return false;
+            }
+        }
+
+        return !(head_position.x < 0
+            || head_position.x >= this.x_slices
+            || head_position.y < 0
+            || head_position.y >= this.y_slices);
+    }
+
     move(): void
     {
         const segment = this.snake.body.first!.data;
@@ -550,32 +568,12 @@ class Game {
         }
         else
         {
-            this.snake.move();
-            if (this.check_colisions()) {
+            if (this.is_valid_head_position(head)) {
+                this.snake.move();
+            } else {
                 this.status = GameStatus.Lost;
             }
         }
-    }
-
-    check_colisions(): boolean
-    {
-        let it = this.snake.body.first;
-        let node = it!;
-
-        const head_segment = node.data;
-
-        for (it = node.next; it != null; it = node.next)
-        {
-            node = it!;
-            if (node.data.position.equal(head_segment.position)) {
-                return true;
-            }
-        }
-
-        return (head_segment.position.x < 0
-            || head_segment.position.x >= this.x_slices
-            || head_segment.position.y < 0
-            || head_segment.position.y >= this.y_slices);
     }
 
     render(renderer: Renderer): void
