@@ -1,7 +1,7 @@
 class DoublyLinkedListNode<T> {
     data: T;
-    next: DoublyLinkedListNode<T> = null;
-    previous: DoublyLinkedListNode<T> = null;
+    next: DoublyLinkedListNode<T> | null = null;
+    previous: DoublyLinkedListNode<T> | null = null;
 
     constructor(data: T)
     {
@@ -10,8 +10,8 @@ class DoublyLinkedListNode<T> {
 };
 
 class DoublyLinkedList<T> {
-    first: DoublyLinkedListNode<T> = null;
-    last: DoublyLinkedListNode<T> = null;
+    first: DoublyLinkedListNode<T> | null = null;
+    last: DoublyLinkedListNode<T> | null = null;
     count: number = 0;
 
     constructor(elements: T[])
@@ -27,7 +27,7 @@ class DoublyLinkedList<T> {
 
         if (this.count > 0)
         {
-            this.last.next = node;
+            this.last!.next = node;
             node.previous = this.last;
             this.last = node;
             this.count += 1;
@@ -46,7 +46,7 @@ class DoublyLinkedList<T> {
 
         if (this.count > 0)
         {
-            this.first.previous = node;
+            this.first!.previous = node;
             node.next = this.first;
             this.first = node;
             this.count += 1;
@@ -61,42 +61,42 @@ class DoublyLinkedList<T> {
 };
 
 class Vec2 {
-		x: number;
-		y: number;
+    x: number;
+    y: number;
 
-		constructor(x: number, y: number)
-		{
-				this.x = x;
-				this.y = y;
-		}
+    constructor(x: number, y: number)
+    {
+        this.x = x;
+        this.y = y;
+    }
 
     copy(): Vec2
     {
         return new Vec2(this.x, this.y);
     }
 
-		copy_from_vec2(v: Vec2)
-		{
-				this.x = v.x;
-				this.y = v.y;
-		}
+    copy_from_vec2(v: Vec2)
+    {
+        this.x = v.x;
+        this.y = v.y;
+    }
 
-		put(x: number, y: number): void
-		{
-				this.x = x;
-				this.y = y;
-		}
+    put(x: number, y: number): void
+    {
+        this.x = x;
+        this.y = y;
+    }
 
-		add(v: Vec2): void
-		{
-				this.x += v.x;
-				this.y += v.y;
-		}
+    add(v: Vec2): void
+    {
+        this.x += v.x;
+        this.y += v.y;
+    }
 
-		equal(v: Vec2): boolean
-		{
-				return this.x === v.x && this.y === v.y;
-		}
+    equal(v: Vec2): boolean
+    {
+        return this.x === v.x && this.y === v.y;
+    }
 };
 
 class VertexArrayAttribute {
@@ -158,17 +158,13 @@ class Renderer {
 
     constructor(gl: WebGLRenderingContext)
     {
-        let buffers: VertexArrayBuffer[] = [null, null];
-        let program: WebGLProgram = null;
-        let uniforms = new Map<string, Uniform>();
-
-        {
-            {
+        const buffers = function(): VertexArrayBuffer[] {
+            let buffer0 = function() {
                 const data = new Float32Array([
                     0, 0,
-								    0, 1,
-								    1, 0,
-								    1, 1
+                    0, 1,
+                    1, 0,
+                    1, 1
                 ]);
                 const buffer_size = data.length * 4;
                 const attribute = new VertexArrayAttribute(
@@ -184,10 +180,10 @@ class Renderer {
                 gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
                 gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
 
-                buffers[0] = new VertexArrayBuffer(buffer, buffer_size, [attribute]);
-            }
+                return new VertexArrayBuffer(buffer, buffer_size, [attribute]);
+            }();
 
-            {
+            let buffer1 = function() {
                 const buffer_size = 4 * 1024;
                 const attribute = new VertexArrayAttribute(
                     0,
@@ -202,14 +198,16 @@ class Renderer {
                 gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
                 gl.bufferData(gl.ARRAY_BUFFER, buffer_size, gl.DYNAMIC_DRAW);
 
-                buffers[1] = new VertexArrayBuffer(buffer, buffer_size, [attribute]);
-            }
-        }
+                return new VertexArrayBuffer(buffer, buffer_size, [attribute]);
+            }();
 
-        {
+            return [buffer0, buffer1];
+        }();
+
+        const program = function(): WebGLProgram {
             const vertex_shader_source = "attribute vec2 position;\n"
                 + "uniform mat4 transform;\n"
-				        + "uniform mat4 projection;\n"
+                + "uniform mat4 projection;\n"
                 + "void main()\n"
                 + "{\n"
                 + "  gl_Position = projection * transform * vec4(position, 0.0, 1.0);\n"
@@ -221,13 +219,15 @@ class Renderer {
 
             const vertex_shader = create_shader(gl, gl.VERTEX_SHADER, vertex_shader_source);
             const fragment_shader = create_shader(gl, gl.FRAGMENT_SHADER, fragment_shader_source);
-            program = create_program(gl, vertex_shader, fragment_shader);
+            const program = create_program(gl, vertex_shader, fragment_shader);
 
             gl.deleteShader(vertex_shader);
             gl.deleteShader(fragment_shader);
-        }
 
-        {
+            return program;
+        }();
+
+        const uniforms = function(): Map<string, Uniform> {
             gl.useProgram(program);
 
             const transform_uniform_name = "transform";
@@ -236,29 +236,31 @@ class Renderer {
             const transform_loc = gl.getUniformLocation(program, transform_uniform_name);
             const projection_loc = gl.getUniformLocation(program, projection_uniform_name);
 
-            if (transform_loc === 0)
+            if (!transform_loc)
                 alert("couldn't find uniform \"" + transform_uniform_name + "\"");
 
-            if (projection_loc === 0)
+            if (!projection_loc)
                 alert("couldn't find uniform \"" + projection_uniform_name + "\"");
 
             const transform_matrix = new Mat4([
                 1, 0, 0, 0,
-				        0, 1, 0, 0,
-				        0, 0, 1, 0,
-				        0, 0, 0, 1,
+                0, 1, 0, 0,
+                0, 0, 1, 0,
+                0, 0, 0, 1,
             ]);
 
             const projection_matrix = new Mat4([
                 2.0 / (RIGHT - LEFT), 0, 0, 0,
-				        0, 2.0 / (TOP - BOTTOM), 0, 0,
-				        0, 0, 1, 0,
-				        (-1.0) * (RIGHT + LEFT) / (RIGHT - LEFT), (-1.0) * (TOP + BOTTOM) / (TOP - BOTTOM), 0, 1,
+                0, 2.0 / (TOP - BOTTOM), 0, 0,
+                0, 0, 1, 0,
+                (-1.0) * (RIGHT + LEFT) / (RIGHT - LEFT), (-1.0) * (TOP + BOTTOM) / (TOP - BOTTOM), 0, 1,
             ]);
 
-            uniforms.set(transform_uniform_name, new Uniform(transform_loc, transform_matrix));
-            uniforms.set(projection_uniform_name, new Uniform(projection_loc, projection_matrix));
-        }
+            return new Map<string, Uniform>([
+                [transform_uniform_name, new Uniform(transform_loc!, transform_matrix)],
+                [projection_uniform_name, new Uniform(projection_loc!, projection_matrix)]
+            ]);
+        }();
 
         this.gl = gl;
         this.buffers = buffers;
@@ -288,11 +290,13 @@ class Renderer {
     {
         const uniform = this.uniforms.get("transform");
 
-        let data = uniform.matrix.data;
-        data[4 * 0 + 0] = width;
-        data[4 * 1 + 1] = height;
-        data[4 * 3 + 0] = position.x;
-        data[4 * 3 + 1] = position.y;
+        if (uniform) { // Why can it be undefined?
+            let data = uniform.matrix.data;
+            data[4 * 0 + 0] = width;
+            data[4 * 1 + 1] = height;
+            data[4 * 3 + 0] = position.x;
+            data[4 * 3 + 1] = position.y;
+        }
 
         // TODO: remove magic number (buffer index == 0).
         this.bind(0);
@@ -321,11 +325,13 @@ class Renderer {
 
         const uniform = this.uniforms.get("transform");
 
-        let data = uniform.matrix.data;
-        data[4 * 0 + 0] = 1;
-        data[4 * 1 + 1] = 1;
-        data[4 * 3 + 0] = 0;
-        data[4 * 3 + 1] = 0;
+        if (uniform) { // Why can it be undefined?
+            let data = uniform.matrix.data;
+            data[4 * 0 + 0] = 1;
+            data[4 * 1 + 1] = 1;
+            data[4 * 3 + 0] = 0;
+            data[4 * 3 + 1] = 0;
+        }
 
         this.bind(1);
         this.draw(this.gl.LINES, 0, points.length / 2);
@@ -345,109 +351,114 @@ class Renderer {
 };
 
 class Mat4 {
-		data: Float32Array;
+    data: Float32Array;
 
-		constructor(array: number[])
-		{
+    constructor(array: number[])
+    {
         if (array.length != 16)
             alert("expected 16 values, but got " + array.length);
-				this.data = new Float32Array(array);
-		}
+        this.data = new Float32Array(array);
+    }
 };
 
 class SnakeSegment {
-		position: Vec2;
-		direction: Vec2;
+    position: Vec2;
+    direction: Vec2;
 
-		constructor(position: Vec2, direction: Vec2)
-		{
-				this.position = position;
-				this.direction = direction;
-		}
+    constructor(position: Vec2, direction: Vec2)
+    {
+        this.position = position;
+        this.direction = direction;
+    }
 };
 
 class Snake {
-		body: DoublyLinkedList<SnakeSegment>;
+    body: DoublyLinkedList<SnakeSegment>;
 
-		constructor()
-		{
+    constructor()
+    {
         this.body = new DoublyLinkedList<SnakeSegment>([
             new SnakeSegment(new Vec2(0, 0), new Vec2(-1, 0)),
             new SnakeSegment(new Vec2(1, 0), new Vec2(-1, 0)),
             new SnakeSegment(new Vec2(2, 0), new Vec2(-1, 0)),
         ]);
-		}
+    }
 
-		move(): void
-		{
+    move(): void
+    {
         let it = this.body.last;
-				for (let i = this.body.count; i-- > 1; it = it.previous)
-				{
-						let segment = it.data;
-						segment.position.add(segment.direction);
-						segment.direction.copy_from_vec2(it.previous.data.direction);
-				}
+        for (let i = this.body.count; i-- > 1; it = it!.previous)
+        {
+            let node = it!;
 
-        let segment = it.data;
-				segment.position.add(segment.direction);
-		}
+            let segment = node.data;
+            segment.position.add(segment.direction);
+            segment.direction.copy_from_vec2(node.previous!.data.direction);
+        }
+
+        let segment = it!.data;
+        segment.position.add(segment.direction);
+    }
 
     is_position_occupied(position: Vec2): boolean
     {
-        let it = this.body.first;
-				while (it != null)
-				{
+        for (let it = this.body.first; it != null; it = it.next)
+        {
             if (it.data.position.equal(position)) {
                 return true;
             }
-            it = it.next;
-				}
+        }
         return false;
     }
+};
+
+enum GameStatus {
+    Going,
+    Lost,
+    Won,
 };
 
 class Game {
     snake: Snake;
     food_position: Vec2;
     grid: Float32Array;
-    lost: boolean;
+    status: GameStatus;
 
     constructor() {
         const snake = new Snake();
-        let grid: Float32Array = null;
 
         document.addEventListener('keydown', function(event) {
-            const segment = snake.body.first.data;
+            const segment = snake.body.first!.data;
 
             switch (event.key)
             {
                 case "s": {
                     if (!segment.direction.equal(new Vec2(0, 1)))
-                        snake.body.first.data.direction.put(0, -1);
+                        segment.direction.put(0, -1);
                 } break;
                 case "w": {
                     if (!segment.direction.equal(new Vec2(0, -1)))
-                        snake.body.first.data.direction.put(0, 1);
+                        segment.direction.put(0, 1);
                 } break;
                 case "a": {
                     if (!segment.direction.equal(new Vec2(1, 0)))
-                        snake.body.first.data.direction.put(-1, 0);
+                        segment.direction.put(-1, 0);
                 } break;
                 case "d": {
                     if (!segment.direction.equal(new Vec2(-1, 0)))
-                        snake.body.first.data.direction.put(1, 0);
+                        segment.direction.put(1, 0);
                 } break;
             }
         });
 
-        {
+        const grid = function(): Float32Array {
             const xn = (RIGHT - LEFT) + 1;
             const yn = (TOP - BOTTOM) + 1;
 
             const xoffset = (RIGHT - LEFT) / (xn - 1);
             const yoffset = (TOP - BOTTOM) / (yn - 1);
 
-            grid = new Float32Array((xn + yn) * 4);
+            const grid = new Float32Array((xn + yn) * 4);
 
             let point_count = 0;
 
@@ -470,15 +481,17 @@ class Game {
                 grid[point_count + 3] = y;
                 point_count += 4;
             }
-        }
+
+            return grid;
+        }();
 
         this.snake = snake;
-        this.food_position = this.find_food_position();
+        this.food_position = this.find_food_position()!;
         this.grid = grid;
-        this.lost = false;
+        this.status = GameStatus.Going;
     }
 
-    find_food_position(): Vec2
+    find_food_position(): Vec2 | null
     {
         // TODO: explicitly define by how much to partition on x and y diretion.
         const free_block_count = (RIGHT - LEFT) * (TOP - BOTTOM) - this.snake.body.count;
@@ -502,7 +515,7 @@ class Game {
 
     move(): void
     {
-        const segment = this.snake.body.first.data;
+        const segment = this.snake.body.first!.data;
         const head = segment.position.copy();
 
         head.add(segment.direction);
@@ -510,13 +523,20 @@ class Game {
         if (head.equal(this.food_position))
         {
             this.snake.body.insert_first(new SnakeSegment(head, segment.direction.copy()));
-            this.food_position = this.find_food_position();
+
+            const new_food_position = this.find_food_position();
+
+            if (new_food_position) {
+                this.food_position = new_food_position!;
+            } else {
+                this.status = GameStatus.Won;
+            }
         }
         else
         {
             this.snake.move();
             if (this.check_colisions()) {
-                this.lost = true;
+                this.status = GameStatus.Lost;
             }
         }
     }
@@ -524,12 +544,14 @@ class Game {
     check_colisions(): boolean
     {
         let it = this.snake.body.first;
+        let node = it!;
 
-        const head_segment = it.data;
+        const head_segment = node.data;
 
-        for (it = it.next; it != null; it = it.next)
+        for (it = node.next; it != null; it = node.next)
         {
-            if (it.data.position.equal(head_segment.position)) {
+            node = it!;
+            if (node.data.position.equal(head_segment.position)) {
                 return true;
             }
         }
@@ -545,10 +567,10 @@ class Game {
         renderer.draw_lines(this.grid);
 
         for (let it = this.snake.body.first; it != null; it = it.next)
-				{
+        {
             const segment = it.data;
             renderer.draw_rect(segment.position, 1, 1);
-				}
+        }
 
         renderer.draw_rect(this.food_position, 1, 1);
     }
@@ -558,38 +580,43 @@ main();
 
 function main(): void
 {
-    let renderer = function (){
+    const renderer = function(): Renderer {
         const canvas = document.getElementById("canvas") as HTMLCanvasElement;
         const gl = canvas.getContext("webgl");
 
-        if (gl === null)
+        if (!gl)
         {
+            // TODO: handle alerts somehow.
             alert("Unable to initialize WebGL. Your browser or machine may not support it.");
-            return;
         }
 
-        return new Renderer(gl);
+        return new Renderer(gl!);
     }();
-    let game = new Game();
+
+    const game = new Game();
 
     renderer.gl.clearColor(73/255.0, 89/255.0, 81/255.0, 1.0);
 
-		let i = 0;
+    let i = 0;
 
     function go()
     {
         renderer.gl.clear(renderer.gl.COLOR_BUFFER_BIT);
 
-        if (!game.lost)
-        {
-				    if (i % 32 == 0) {
-                game.move();
-            }
+        switch (game.status) {
+            case GameStatus.Going: {
+                if (i % 32 == 0) {
+                    game.move();
+                }
+            } break;
+            case GameStatus.Lost:
+            case GameStatus.Won:
+                break;
         }
 
         game.render(renderer);
 
-				i += 1;
+        i += 1;
 
         window.requestAnimationFrame(go);
     }
@@ -599,7 +626,14 @@ function main(): void
 
 function create_shader(gl: WebGLRenderingContext, type: number, source: string): WebGLShader
 {
-    const shader = gl.createShader(type);
+    const has_shader = gl.createShader(type);
+
+    if (!has_shader) {
+        // TODO: Handle alerts.
+        alert("failed to create shader");
+    }
+
+    const shader = has_shader!;
 
     gl.shaderSource(shader, source);
     gl.compileShader(shader);
