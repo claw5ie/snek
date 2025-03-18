@@ -509,12 +509,13 @@ class SnakeSegment {
 class Snake {
     body: DoublyLinkedList<SnakeSegment>;
 
-    constructor()
+    constructor(position: Vec2)
     {
+        // TODO: assert that the snake doesn't go outside of the bounds.
         this.body = new DoublyLinkedList<SnakeSegment>([
-            new SnakeSegment(new Vec2(2, 0), new Vec2(1, 0)),
-            new SnakeSegment(new Vec2(1, 0), new Vec2(1, 0)),
-            new SnakeSegment(new Vec2(0, 0), new Vec2(1, 0)),
+            new SnakeSegment(new Vec2(position.x - 0, position.y + 0), new Vec2(1, 0)),
+            new SnakeSegment(new Vec2(position.x - 1, position.y + 0), new Vec2(1, 0)),
+            new SnakeSegment(new Vec2(position.x - 2, position.y + 0), new Vec2(1, 0)),
         ]);
     }
 
@@ -565,7 +566,7 @@ class Game {
     grid: Float32Array;
 
     constructor(x_slices: number, y_slices: number) {
-        const snake = new Snake();
+        const snake = new Snake(new Vec2(x_slices / 2, y_slices / 2));
 
         const grid = function(): Float32Array {
             const x_line_count = x_slices + 1;
@@ -717,7 +718,7 @@ class Game {
             const segment = it.data;
             const position = segment.position.copy();
             const actual_position = to_local_coordinated(position);
-            renderer.draw_rect_centered(actual_position, body_color, width, height, 0.98);
+            renderer.draw_rect_centered(actual_position, body_color, width, height, 0.92);
         }
 
         switch (this.status)
@@ -752,7 +753,7 @@ function main(): void
         return new Renderer(gl!);
     }();
 
-    const game = new Game(4, 3);
+    const game = new Game(4 * 2, 3 * 2);
 
     document.addEventListener('keydown', function(event) {
         let head = game.snake.body.first;
