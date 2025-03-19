@@ -416,7 +416,7 @@ class Renderer {
 
         if (array_buffer.buffer_size < points.length * 4)
         {
-            alert("drawing too many lines");
+            alert(`drawing too many lines (${points.length} points)`);
             return;
         }
 
@@ -555,6 +555,15 @@ enum GameStatus {
     Victory,
 };
 
+const MINIMUM_ROW_COUNT = 6;
+const MINIMUM_COLUMN_COUNT = 8;
+
+const MAXIMUM_ROW_COUNT = 32;
+const MAXIMUM_COLUMN_COUNT = 32;
+
+const DEFAULT_ROW_COUNT = MINIMUM_ROW_COUNT;
+const DEFAULT_COLUMN_COUNT = MINIMUM_COLUMN_COUNT;
+
 class Game {
     x_slices: number;
     y_slices: number;
@@ -562,10 +571,17 @@ class Game {
     snake: Snake;
     food: Food;
     status: GameStatus;
+    score: number;
 
     grid: Float32Array;
 
-    constructor(x_slices: number, y_slices: number) {
+    constructor(x_slices: number, y_slices: number)
+    {
+        this.reset(x_slices, y_slices);
+    }
+
+    reset(x_slices: number, y_slices: number): void
+    {
         const snake = new Snake(new Vec2(x_slices / 2, y_slices / 2));
 
         const grid = function(): Float32Array {
@@ -607,6 +623,7 @@ class Game {
         this.snake = snake;
         this.food = this.find_food_position()!;
         this.status = GameStatus.Going;
+        this.score = 0;
         this.grid = grid;
     }
 
@@ -664,6 +681,8 @@ class Game {
 
         if (head.equal(this.food))
         {
+            this.score += 1;
+
             this.snake.body.insert_first(new SnakeSegment(head, segment.direction.copy()));
 
             const new_food = this.find_food_position();
@@ -753,7 +772,27 @@ function main(): void
         return new Renderer(gl!);
     }();
 
-    const game = new Game(4 * 2, 3 * 2);
+    const game = new Game(DEFAULT_COLUMN_COUNT, DEFAULT_ROW_COUNT);
+
+    const rows_input = document.getElementById("rows") as HTMLFormElement;
+    const columns_input = document.getElementById("columns") as HTMLFormElement;
+    const score_input = document.getElementById("score") as HTMLFormElement;
+
+    if (!rows_input) {
+        alert("missing rows input");
+    }
+
+    if (!columns_input) {
+        alert("missing columns input");
+    }
+
+    if (!score_input) {
+        alert("missing score input");
+    }
+
+    rows_input.value = DEFAULT_ROW_COUNT.toString();
+    columns_input.value = DEFAULT_COLUMN_COUNT.toString();
+    score_input.value = "0";
 
     document.addEventListener('keydown', function(event) {
         let head = game.snake.body.first;
@@ -783,10 +822,30 @@ function main(): void
             case "a": set_direction(unit_left_vec2);  break;
             case "d": set_direction(unit_right_vec2); break;
             case "r": {
-                const new_game = new Game(game.x_slices, game.y_slices);
-                game.snake = new_game.snake;
-                game.food = new_game.food;
-                game.status = new_game.status;
+                let rows: number = +rows_input.value;
+                let columns: number = +columns_input.value;
+                let ok = true;
+
+                if (rows < MINIMUM_ROW_COUNT || rows > MAXIMUM_ROW_COUNT) {
+                    alert(`The number of rows (${rows}) must be in range [${MINIMUM_ROW_COUNT}, ${MAXIMUM_ROW_COUNT}]`);
+                    ok = false;
+                }
+
+                if (columns < MINIMUM_COLUMN_COUNT || columns > MAXIMUM_COLUMN_COUNT) {
+                    alert(`The number of columns (${columns}) must be in range [${MINIMUM_COLUMN_COUNT}, ${MAXIMUM_COLUMN_COUNT}]`);
+                    ok = false;
+                }
+
+                if (!ok) {
+                    columns = game.x_slices;
+                    rows = game.y_slices;
+                }
+
+                rows_input.value = rows.toString();
+                columns_input.value = columns.toString();
+                score_input.value = "0";
+
+                game.reset(columns, rows);
                 ticks = 0;
             } break;
         }
@@ -803,6 +862,7 @@ function main(): void
             case GameStatus.Going: {
                 if (ticks % 32 == 0) {
                     game.move();
+                    score_input.value = game.score.toString();
                 }
             } break;
             case GameStatus.Defeat:
