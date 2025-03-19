@@ -125,6 +125,7 @@ class Vec4 {
     }
 };
 
+const backround_color = new Vec4(73/255.0, 89/255.0, 81/255.0, 1.0);
 const default_color = new Vec4(70.0/255.0, 70.0/255.0, 70.0/255.0, 1.0);
 const red_color = new Vec4(1, 0, 0, 1.0);
 const green_color = new Vec4(0, 1, 0, 1.0);
@@ -159,21 +160,19 @@ class VertexArrayAttribute {
 };
 
 class UniformMat4 {
-    tag: "matrix";
+    tag: "matrix" = "matrix";
     matrix: Mat4;
 
     constructor(matrix: Mat4) {
-        this.tag = "matrix";
         this.matrix = matrix;
     }
 };
 
 class UniformVec4 {
-    tag: "vector";
+    tag: "vector" = "vector";
     vector: Vec4;
 
     constructor(vector: Vec4) {
-        this.tag = "vector";
         this.vector = vector;
     }
 };
@@ -190,11 +189,6 @@ class Uniform {
         this.data     = data;
     }
 };
-
-const LEFT = -8;
-const RIGHT = 8;
-const BOTTOM = -6;
-const TOP = 6;
 
 class VertexArrayBuffer {
     buffer: WebGLBuffer;
@@ -213,6 +207,11 @@ class Renderer {
     buffers: VertexArrayBuffer[];
     program: WebGLProgram;
     uniforms: Map<string, Uniform>;
+
+    left: number = -8;
+    right: number = 8;
+    bottom: number = -6;
+    top: number = 6;
 
     constructor(gl: WebGLRenderingContext)
     {
@@ -287,7 +286,7 @@ class Renderer {
             return program;
         }();
 
-        const uniforms = function(): Map<string, Uniform> {
+        const make_uniforms = (): Map<string, Uniform> => {
             gl.useProgram(program);
 
             const transform_uniform_name = "transform";
@@ -298,14 +297,9 @@ class Renderer {
             const projection_loc = gl.getUniformLocation(program, projection_uniform_name);
             const color_loc = gl.getUniformLocation(program, color_uniform_name);
 
-            if (!transform_loc)
-                alert("couldn't find uniform \"" + transform_uniform_name + "\"");
-
-            if (!projection_loc)
-                alert("couldn't find uniform \"" + projection_uniform_name + "\"");
-
-            if (!color_loc)
-                alert("couldn't find uniform \"" + color_uniform_name + "\"");
+            critical_error_if(!transform_loc, "couldn't find uniform \"" + transform_uniform_name + "\"");
+            critical_error_if(!projection_loc, "couldn't find uniform \"" + projection_uniform_name + "\"");
+            critical_error_if(!color_loc, "couldn't find uniform \"" + color_uniform_name + "\"");
 
             const transform_matrix = new Mat4([
                 1, 0, 0, 0,
@@ -315,10 +309,10 @@ class Renderer {
             ]);
 
             const projection_matrix = new Mat4([
-                2.0 / (RIGHT - LEFT), 0, 0, 0,
-                0, 2.0 / (TOP - BOTTOM), 0, 0,
+                2.0 / (this.right - this.left), 0, 0, 0,
+                0, 2.0 / (this.top - this.bottom), 0, 0,
                 0, 0, 1, 0,
-                (-1.0) * (RIGHT + LEFT) / (RIGHT - LEFT), (-1.0) * (TOP + BOTTOM) / (TOP - BOTTOM), 0, 1,
+                (-1.0) * (this.right + this.left) / (this.right - this.left), (-1.0) * (this.top + this.bottom) / (this.top - this.bottom), 0, 1,
             ]);
 
             const color = new Vec4(0, 0, 0, 1);
@@ -328,7 +322,8 @@ class Renderer {
                 [projection_uniform_name, new Uniform(projection_loc!, new UniformMat4(projection_matrix))],
                 [color_uniform_name, new Uniform(color_loc!, new UniformVec4(color))],
             ]);
-        }();
+        };
+        const uniforms = make_uniforms();
 
         this.gl = gl;
         this.buffers = buffers;
@@ -405,20 +400,12 @@ class Renderer {
 
     draw_lines(color: Vec4, points: Float32Array)
     {
-        if (points.length % 4 != 0) {
-            alert("expected 4 points per line (start.x, start.y, end.x, end.y)");
-            return;
-        }
-
+        critical_error_if(points.length % 4 != 0, "expected 4 points per line (start.x, start.y, end.x, end.y)");
 
         // TODO: remove magic number (buffer index == 1).
         const array_buffer = this.buffers[1];
 
-        if (array_buffer.buffer_size < points.length * 4)
-        {
-            alert(`drawing too many lines (${points.length} points)`);
-            return;
-        }
+        critical_error_if(array_buffer.buffer_size < points.length * 4, `drawing too many lines (${points.length} points)`)
 
         this.gl.bindBuffer(this.gl.ARRAY_BUFFER, array_buffer.buffer);
         this.gl.bufferSubData(this.gl.ARRAY_BUFFER, 0, points);
@@ -489,8 +476,8 @@ class Mat4 {
 
     constructor(array: number[])
     {
-        if (array.length != 16)
-            alert("expected 16 values, but got " + array.length);
+        critical_error_if(array.length != 16, `expected 16 values, but got ${array.length}`);
+
         this.data = new Float32Array(array);
     }
 };
@@ -573,8 +560,6 @@ class Game {
     status: GameStatus;
     score: number;
 
-    grid: Float32Array;
-
     constructor(x_slices: number, y_slices: number)
     {
         this.reset(x_slices, y_slices);
@@ -584,47 +569,12 @@ class Game {
     {
         const snake = new Snake(new Vec2(x_slices / 2, y_slices / 2));
 
-        const grid = function(): Float32Array {
-            const x_line_count = x_slices + 1;
-            const y_line_count = y_slices + 1;
-
-            const x_offset = (RIGHT - LEFT) / (x_line_count - 1);
-            const y_offset = (TOP - BOTTOM) / (y_line_count - 1);
-
-            const grid = new Float32Array((x_line_count + y_line_count) * 4);
-
-            let point_count = 0;
-
-            for (let i = 0; i < x_line_count; i++)
-            {
-                const x = LEFT + i * x_offset;
-                grid[point_count + 0] = x;
-                grid[point_count + 1] = BOTTOM;
-                grid[point_count + 2] = x;
-                grid[point_count + 3] = TOP;
-                point_count += 4;
-            }
-
-            for (let i = 0; i < y_line_count; i++)
-            {
-                const y = BOTTOM + i * y_offset;
-                grid[point_count + 0] = LEFT;
-                grid[point_count + 1] = y;
-                grid[point_count + 2] = RIGHT;
-                grid[point_count + 3] = y;
-                point_count += 4;
-            }
-
-            return grid;
-        }();
-
         this.x_slices = x_slices;
         this.y_slices = y_slices;
         this.snake = snake;
         this.food = this.find_food_position()!;
         this.status = GameStatus.Going;
         this.score = 0;
-        this.grid = grid;
     }
 
     find_food_position(): Vec2 | null
@@ -654,7 +604,8 @@ class Game {
         return null;
     }
 
-    is_valid_head_position(head_position: Vec2): boolean {
+    is_valid_head_position(head_position: Vec2): boolean
+    {
         let it = this.snake.body.first;
         let node = it!;
 
@@ -702,12 +653,134 @@ class Game {
             }
         }
     }
+};
 
-    render(renderer: Renderer): void
+class GameContext {
+    game: Game;
+
+    grid: Float32Array;
+
+    rows_form: HTMLFormElement;
+    columns_form: HTMLFormElement;
+    score_form: HTMLFormElement;
+
+    renderer: Renderer;
+
+    constructor (renderer: Renderer)
+    {
+        const game = new Game(DEFAULT_COLUMN_COUNT, DEFAULT_ROW_COUNT);
+
+        const grid = make_grid(renderer, game.x_slices, game.y_slices);
+
+        const rows_form = document.getElementById("rows") as HTMLFormElement;
+        const columns_form = document.getElementById("columns") as HTMLFormElement;
+        const score_form = document.getElementById("score") as HTMLFormElement;
+
+        critical_error_if(!rows_form, "missing 'rows' form");
+        critical_error_if(!columns_form, "missing 'columns' form");
+        critical_error_if(!score_form, "missing 'score' form");
+
+        rows_form.value = DEFAULT_ROW_COUNT.toString();
+        columns_form.value = DEFAULT_COLUMN_COUNT.toString();
+        score_form.value = "0";
+
+        this.game = game;
+        this.grid = grid;
+        this.rows_form = rows_form;
+        this.columns_form = columns_form;
+        this.score_form = score_form;
+        this.renderer = renderer;
+
+        this.finish_initialization();
+    }
+
+    // NOTE: don't want to accept inputs before fields are initialized.
+    finish_initialization(): void
+    {
+        document.addEventListener('keydown', (event) => {
+            const set_direction = (direction: Vec2): void => {
+                let head = this.game.snake.body.first;
+                let after_head = head!.next;
+
+                if (!after_head) {
+                    return;
+                }
+
+                const head_segment = head!.data;
+                const head_position = head_segment.position.copy();
+
+                const after_head_segment = after_head.data;
+
+                head_position.add(direction);
+
+                if (!head_position.equal(after_head_segment.position)) {
+                    head_segment.direction.copy_from_vec2(direction);
+                }
+            };
+
+            switch (event.key)
+            {
+                case "s": set_direction(unit_down_vec2);  break;
+                case "w": set_direction(unit_up_vec2);    break;
+                case "a": set_direction(unit_left_vec2);  break;
+                case "d": set_direction(unit_right_vec2); break;
+                case "r": {
+                    let rows: number = +this.rows_form.value;
+                    let columns: number = +this.columns_form.value;
+                    let ok = true;
+
+                    if (rows < MINIMUM_ROW_COUNT || rows > MAXIMUM_ROW_COUNT) {
+                        alert(`The number of rows (${rows}) must be in range [${MINIMUM_ROW_COUNT}, ${MAXIMUM_ROW_COUNT}]`);
+                        ok = false;
+                    }
+
+                    if (columns < MINIMUM_COLUMN_COUNT || columns > MAXIMUM_COLUMN_COUNT) {
+                        alert(`The number of columns (${columns}) must be in range [${MINIMUM_COLUMN_COUNT}, ${MAXIMUM_COLUMN_COUNT}]`);
+                        ok = false;
+                    }
+
+                    if (!ok) {
+                        columns = this.game.x_slices;
+                        rows = this.game.y_slices;
+                    }
+
+                    this.rows_form.value = rows.toString();
+                    this.columns_form.value = columns.toString();
+                    this.score_form.value = "0";
+
+                    this.reset(columns, rows);
+                    ticks = 0;
+                } break;
+            }
+        });
+    }
+
+    reset(columns: number, rows: number): void
+    {
+        this.game.reset(columns, rows);
+        this.grid = make_grid(this.renderer, columns, rows);
+    }
+
+    move(): void
+    {
+        switch (this.game.status)
+        {
+            case GameStatus.Going: {
+                if (ticks % 32 == 0) {
+                    this.game.move();
+                    this.score_form.value = this.game.score.toString();
+                }
+            } break;
+            case GameStatus.Defeat:
+            case GameStatus.Victory: break;
+        }
+    }
+
+    render(): void
     {
         let body_color = default_color;
 
-        switch (this.status)
+        switch (this.game.status)
         {
             case GameStatus.Going: break;
             case GameStatus.Defeat: {
@@ -718,165 +791,125 @@ class Game {
             } break;
         }
 
-        const width = (RIGHT - LEFT) / this.x_slices;
-        const height = (TOP - BOTTOM) / this.y_slices;
+        const width = (this.renderer.right - this.renderer.left) / this.game.x_slices;
+        const height = (this.renderer.top - this.renderer.bottom) / this.game.y_slices;
 
-        const to_local_coordinated = function(position: Vec2): Vec2 {
+        const to_local_coordinated = (position: Vec2): Vec2 => {
             const p = position.copy();
             p.x *= width;
-            p.x += LEFT;
+            p.x += this.renderer.left;
             p.y *= height;
-            p.y += BOTTOM;
+            p.y += this.renderer.bottom;
             return p;
         };
 
-        renderer.draw_lines(default_color, this.grid);
+        this.renderer.draw_lines(default_color, this.grid);
 
-        for (let it = this.snake.body.first; it != null; it = it.next)
+        for (let it = this.game.snake.body.first; it != null; it = it.next)
         {
             const segment = it.data;
             const position = segment.position.copy();
             const actual_position = to_local_coordinated(position);
-            renderer.draw_rect_centered(actual_position, body_color, width, height, 0.92);
+            this.renderer.draw_rect_centered(actual_position, body_color, width, height, 0.92);
         }
 
-        switch (this.status)
+        switch (this.game.status)
         {
             case GameStatus.Going:
             case GameStatus.Defeat: {
-                const position = this.food;
+                const position = this.game.food;
                 const actual_position = to_local_coordinated(position);
-                renderer.draw_rect_centered(actual_position, dark_red_color, width, height, 0.5);
+                this.renderer.draw_rect_centered(actual_position, dark_red_color, width, height, 0.5);
             } break;
             case GameStatus.Victory: break;
         }
     }
 };
 
-main();
+function make_grid(renderer: Renderer, x_slices: number, y_slices: number): Float32Array
+{
+    const x_line_count = x_slices + 1;
+    const y_line_count = y_slices + 1;
+
+    const x_offset = (renderer.right - renderer.left) / (x_line_count - 1);
+    const y_offset = (renderer.top - renderer.bottom) / (y_line_count - 1);
+
+    const grid = new Float32Array((x_line_count + y_line_count) * 4);
+
+    let comp_count = 0;
+
+    for (let i = 0; i < x_line_count; i++)
+    {
+        const x = renderer.left + i * x_offset;
+        grid[comp_count + 0] = x;
+        grid[comp_count + 1] = renderer.bottom;
+        grid[comp_count + 2] = x;
+        grid[comp_count + 3] = renderer.top;
+        comp_count += 4;
+    }
+
+    for (let i = 0; i < y_line_count; i++)
+    {
+        const y = renderer.bottom + i * y_offset;
+        grid[comp_count + 0] = renderer.left;
+        grid[comp_count + 1] = y;
+        grid[comp_count + 2] = renderer.right;
+        grid[comp_count + 3] = y;
+        comp_count += 4;
+    }
+
+    return grid;
+}
 
 var ticks: number = 0;
 
 function main(): void
 {
-    const renderer = function(): Renderer {
-        const canvas = document.getElementById("canvas") as HTMLCanvasElement;
-        const gl = canvas.getContext("webgl");
-
-        if (!gl)
-        {
-            // TODO: handle alerts somehow.
-            alert("Unable to initialize WebGL. Your browser or machine may not support it.");
-        }
-
-        return new Renderer(gl!);
-    }();
-
-    const game = new Game(DEFAULT_COLUMN_COUNT, DEFAULT_ROW_COUNT);
-
-    const rows_input = document.getElementById("rows") as HTMLFormElement;
-    const columns_input = document.getElementById("columns") as HTMLFormElement;
-    const score_input = document.getElementById("score") as HTMLFormElement;
-
-    if (!rows_input) {
-        alert("missing rows input");
-    }
-
-    if (!columns_input) {
-        alert("missing columns input");
-    }
-
-    if (!score_input) {
-        alert("missing score input");
-    }
-
-    rows_input.value = DEFAULT_ROW_COUNT.toString();
-    columns_input.value = DEFAULT_COLUMN_COUNT.toString();
-    score_input.value = "0";
-
-    document.addEventListener('keydown', function(event) {
-        let head = game.snake.body.first;
-        let after_head = head!.next;
-
-        if (!after_head) {
-            return;
-        }
-
-        const head_segment = head!.data;
-        const head_position = head_segment.position.copy();
-
-        const after_head_segment = after_head.data;
-
-        const set_direction = function(direction: Vec2): void {
-            head_position.add(direction);
-
-            if (!head_position.equal(after_head_segment.position)) {
-                head_segment.direction.copy_from_vec2(direction);
-            }
-        };
-
-        switch (event.key)
-        {
-            case "s": set_direction(unit_down_vec2);  break;
-            case "w": set_direction(unit_up_vec2);    break;
-            case "a": set_direction(unit_left_vec2);  break;
-            case "d": set_direction(unit_right_vec2); break;
-            case "r": {
-                let rows: number = +rows_input.value;
-                let columns: number = +columns_input.value;
-                let ok = true;
-
-                if (rows < MINIMUM_ROW_COUNT || rows > MAXIMUM_ROW_COUNT) {
-                    alert(`The number of rows (${rows}) must be in range [${MINIMUM_ROW_COUNT}, ${MAXIMUM_ROW_COUNT}]`);
-                    ok = false;
-                }
-
-                if (columns < MINIMUM_COLUMN_COUNT || columns > MAXIMUM_COLUMN_COUNT) {
-                    alert(`The number of columns (${columns}) must be in range [${MINIMUM_COLUMN_COUNT}, ${MAXIMUM_COLUMN_COUNT}]`);
-                    ok = false;
-                }
-
-                if (!ok) {
-                    columns = game.x_slices;
-                    rows = game.y_slices;
-                }
-
-                rows_input.value = rows.toString();
-                columns_input.value = columns.toString();
-                score_input.value = "0";
-
-                game.reset(columns, rows);
-                ticks = 0;
-            } break;
-        }
-    });
-
-    renderer.gl.clearColor(73/255.0, 89/255.0, 81/255.0, 1.0);
-
-    function go()
+    try
     {
-        renderer.gl.clear(renderer.gl.COLOR_BUFFER_BIT);
+        const renderer = function(): Renderer {
+            const canvas = document.getElementById("canvas") as HTMLCanvasElement;
+            const gl = canvas.getContext("webgl");
 
-        switch (game.status)
+            critical_error_if(!gl, "Unable to initialize WebGL. Your browser or machine may not support it");
+
+            return new Renderer(gl!);
+        }();
+
+        const game_context = new GameContext(renderer);
+
+        game_context.renderer.gl.clearColor(backround_color.x, backround_color.y, backround_color.z, backround_color.w);
+
+        function go()
         {
-            case GameStatus.Going: {
-                if (ticks % 32 == 0) {
-                    game.move();
-                    score_input.value = game.score.toString();
-                }
-            } break;
-            case GameStatus.Defeat:
-            case GameStatus.Victory: break;
+            game_context.renderer.gl.clear(renderer.gl.COLOR_BUFFER_BIT);
+
+            game_context.move();
+            game_context.render();
+
+            ticks += 1;
+
+            window.requestAnimationFrame(go);
         }
 
-        game.render(renderer);
-
-        ticks += 1;
-
-        window.requestAnimationFrame(go);
+        go();
+    } catch (err) {
+        alert(err);
     }
+}
 
-    go();
+main();
+
+function critical_error_if(condition: boolean, message: string): void
+{
+    if (condition) {
+        throw new Error(message);
+    }
+}
+
+function critical_error(message: string): void
+{
+    critical_error_if(true, message);
 }
 
 function debug_print(message: string): void
@@ -890,19 +923,14 @@ function create_shader(gl: WebGLRenderingContext, type: number, source: string):
 {
     const has_shader = gl.createShader(type);
 
-    if (!has_shader) {
-        // TODO: Handle alerts.
-        alert("failed to create shader");
-    }
+    critical_error_if(!has_shader, "failed to create shader");
 
     const shader = has_shader!;
 
     gl.shaderSource(shader, source);
     gl.compileShader(shader);
-    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS))
-    {
-        alert("failed to compile shader: \n" + gl.getShaderInfoLog(shader));
-    }
+
+    critical_error_if(!gl.getShaderParameter(shader, gl.COMPILE_STATUS), "failed to compile shader: \n" + gl.getShaderInfoLog(shader));
 
     return shader;
 }
@@ -916,10 +944,8 @@ function create_program(gl: WebGLRenderingContext, vertex_shader: WebGLShader, f
     gl.linkProgram(program);
     gl.detachShader(program, vertex_shader);
     gl.detachShader(program, fragment_shader);
-    if (!gl.getProgramParameter(program, gl.LINK_STATUS))
-    {
-        alert("failed to link program: \n" + gl.getProgramInfoLog(program));
-    }
+
+    critical_error_if(!gl.getProgramParameter(program, gl.LINK_STATUS), "failed to link program: \n" + gl.getProgramInfoLog(program));
 
     return program;
 }
