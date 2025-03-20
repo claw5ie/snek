@@ -220,35 +220,29 @@ export class Renderer {
     draw_rect(position: Vec2, color: Vec4, width: number, height: number): void
     {
         {
-            const uniform = this.uniforms.get("transform");
+            const uniform = this.uniforms.get("transform")!;
 
-            if (uniform) // Why can it be undefined?
+            switch (uniform.data.tag)
             {
-                switch (uniform.data.tag)
-                {
-                    case "matrix": {
-                        const matrix: Mat4 = uniform.data.matrix;
-                        matrix.data[4 * 0 + 0] = width;
-                        matrix.data[4 * 1 + 1] = height;
-                        matrix.data[4 * 3 + 0] = position.x;
-                        matrix.data[4 * 3 + 1] = position.y;
-                    } break;
-                }
+                case "matrix": {
+                    const matrix: Mat4 = uniform.data.matrix;
+                    matrix.data[4 * 0 + 0] = width;
+                    matrix.data[4 * 1 + 1] = height;
+                    matrix.data[4 * 3 + 0] = position.x;
+                    matrix.data[4 * 3 + 1] = position.y;
+                } break;
             }
         }
 
         {
-            const uniform = this.uniforms.get("color");
+            const uniform = this.uniforms.get("color")!;
 
-            if (uniform) // Why can it be undefined?
+            switch (uniform.data.tag)
             {
-                switch (uniform.data.tag)
-                {
-                    case "vector": {
-                        const vector: Vec4 = uniform.data.vector;
-                        vector.copy_from_vec4(color);
-                    } break;
-                }
+                case "vector": {
+                    const vector: Vec4 = uniform.data.vector;
+                    vector.copy_from_vec4(color);
+                } break;
             }
         }
 
@@ -279,35 +273,29 @@ export class Renderer {
         this.gl.bufferSubData(this.gl.ARRAY_BUFFER, 0, points);
 
         {
-            const uniform = this.uniforms.get("transform");
+            const uniform = this.uniforms.get("transform")!;
 
-            if (uniform) // Why can it be undefined?
+            switch (uniform.data.tag)
             {
-                switch (uniform.data.tag)
-                {
-                    case "matrix": {
-                        const matrix: Mat4 = uniform.data.matrix;
-                        matrix.data[4 * 0 + 0] = 1;
-                        matrix.data[4 * 1 + 1] = 1;
-                        matrix.data[4 * 3 + 0] = 0;
-                        matrix.data[4 * 3 + 1] = 0;
-                    } break;
-                }
+                case "matrix": {
+                    const matrix: Mat4 = uniform.data.matrix;
+                    matrix.data[4 * 0 + 0] = 1;
+                    matrix.data[4 * 1 + 1] = 1;
+                    matrix.data[4 * 3 + 0] = 0;
+                    matrix.data[4 * 3 + 1] = 0;
+                } break;
             }
         }
 
         {
-            const uniform = this.uniforms.get("color");
+            const uniform = this.uniforms.get("color")!;
 
-            if (uniform) // Why can it be undefined?
+            switch (uniform.data.tag)
             {
-                switch (uniform.data.tag)
-                {
-                    case "vector": {
-                        const vector: Vec4 = uniform.data.vector;
-                        vector.copy_from_vec4(color);
-                    } break;
-                }
+                case "vector": {
+                    const vector: Vec4 = uniform.data.vector;
+                    vector.copy_from_vec4(color);
+                } break;
             }
         }
 
