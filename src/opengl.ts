@@ -233,6 +233,12 @@ export class Renderer {
         }
     }
 
+    rescale_canvas(width_to_height_ratio: number): void
+    {
+        this.canvas.height = this.canvas.width / width_to_height_ratio;
+        this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+    }
+
     bind(buffer_index: number): void
     {
         const array_buffer = this.buffers[buffer_index];

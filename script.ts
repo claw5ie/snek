@@ -187,6 +187,8 @@ class GameContext {
                         }
                     }
 
+                    const ratio = columns / rows;
+
                     this.rows_form.value = rows.toString();
                     this.columns_form.value = columns.toString();
                     this.score_form.value = "0";
@@ -195,8 +197,8 @@ class GameContext {
 
                     this.renderer.canvas.width = width;
                     this.renderer.canvas.height = height;
-                    this.renderer.gl.viewport(0, 0, width, height);
-                    this.renderer.rescale_projection(width / height);
+                    this.renderer.rescale_canvas(ratio);
+                    this.renderer.rescale_projection(ratio);
 
                     this.grid = make_grid(this.renderer, columns, rows);
 
