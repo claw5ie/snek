@@ -71,6 +71,7 @@ class GameContext {
     rows_form: HTMLFormElement;
     columns_form: HTMLFormElement;
     score_form: HTMLFormElement;
+    maximum_score_form: HTMLFormElement;
     width_form: HTMLFormElement;
     height_form: HTMLFormElement;
 
@@ -85,18 +86,21 @@ class GameContext {
         const rows_form = document.getElementById("rows") as HTMLFormElement;
         const columns_form = document.getElementById("columns") as HTMLFormElement;
         const score_form = document.getElementById("score") as HTMLFormElement;
+        const maximum_score_form = document.getElementById("maximum_score") as HTMLFormElement;
         const width_form = document.getElementById("width") as HTMLFormElement;
         const height_form = document.getElementById("height") as HTMLFormElement;
 
         critical_error_if(!rows_form, "missing 'rows' form");
         critical_error_if(!columns_form, "missing 'columns' form");
         critical_error_if(!score_form, "missing 'score' form");
+        critical_error_if(!maximum_score_form, "missing 'maximum score' form");
         critical_error_if(!width_form, "missing 'width' form");
         critical_error_if(!height_form, "missing 'height' form");
 
         rows_form.value = DEFAULT_ROW_COUNT.toString();
         columns_form.value = DEFAULT_COLUMN_COUNT.toString();
         score_form.value = "0";
+        maximum_score_form.value = "0";
         width_form.value = renderer.canvas.width.toString();
         height_form.value = renderer.canvas.height.toString();
 
@@ -105,6 +109,7 @@ class GameContext {
         this.rows_form = rows_form;
         this.columns_form = columns_form;
         this.score_form = score_form;
+        this.maximum_score_form = maximum_score_form;
         this.width_form = width_form;
         this.height_form = height_form;
         this.renderer = renderer;
@@ -218,6 +223,7 @@ class GameContext {
                 if (ticks % 32 == 0) {
                     this.game.move();
                     this.score_form.value = this.game.score.toString();
+                    this.maximum_score_form.value = this.game.maximum_score.toString();
                 }
             } break;
             case GameStatus.Defeat:

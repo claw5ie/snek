@@ -68,12 +68,15 @@ export class Game {
     food: Food;
     status: GameStatus;
     score: number;
+    maximum_score: number;
 
     constructor(x_slices: number, y_slices: number)
     {
+        this.maximum_score = 0;
         this.reset(x_slices, y_slices);
     }
 
+    // NOTE: doesn't reset maximum score.
     reset(x_slices: number, y_slices: number): void
     {
         const snake = new Snake(new Vec2(x_slices / 2, y_slices / 2));
@@ -142,6 +145,9 @@ export class Game {
         if (head.equal(this.food))
         {
             this.score += 1;
+            if (this.maximum_score < this.score) {
+                this.maximum_score = this.score;
+            }
 
             this.snake.body.insert_first(new SnakeSegment(head, segment.direction.copy()));
 
