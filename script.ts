@@ -55,6 +55,10 @@ const MAXIMUM_COLUMN_COUNT = 32;
 const DEFAULT_ROW_COUNT = MINIMUM_ROW_COUNT;
 const DEFAULT_COLUMN_COUNT = MINIMUM_COLUMN_COUNT;
 
+const MINIMUM_SPEED = 1;
+const MAXIMUM_SPEED = 32;
+const DEFAULT_SPEED = MINIMUM_SPEED;
+
 // TODO: set sensible values
 const MINIMUM_WIDTH = 400;
 const MAXIMUM_WIDTH = 800;
@@ -65,11 +69,13 @@ const MAXIMUM_HEIGHT = 800;
 
 class GameContext {
     game: Game;
+    game_speed: number;
 
     grid: Float32Array;
 
     rows_form: HTMLFormElement;
     columns_form: HTMLFormElement;
+    speed_form: HTMLFormElement;
     score_form: HTMLFormElement;
     maximum_score_form: HTMLFormElement;
     width_form: HTMLFormElement;
@@ -85,6 +91,7 @@ class GameContext {
 
         const rows_form = document.getElementById("rows") as HTMLFormElement;
         const columns_form = document.getElementById("columns") as HTMLFormElement;
+        const speed_form = document.getElementById("speed") as HTMLFormElement;
         const score_form = document.getElementById("score") as HTMLFormElement;
         const maximum_score_form = document.getElementById("maximum_score") as HTMLFormElement;
         const width_form = document.getElementById("width") as HTMLFormElement;
@@ -92,6 +99,7 @@ class GameContext {
 
         critical_error_if(!rows_form, "missing 'rows' form");
         critical_error_if(!columns_form, "missing 'columns' form");
+        critical_error_if(!speed_form, "missing 'speed' form");
         critical_error_if(!score_form, "missing 'score' form");
         critical_error_if(!maximum_score_form, "missing 'maximum score' form");
         critical_error_if(!width_form, "missing 'width' form");
@@ -99,15 +107,18 @@ class GameContext {
 
         rows_form.value = DEFAULT_ROW_COUNT.toString();
         columns_form.value = DEFAULT_COLUMN_COUNT.toString();
+        speed_form.value = DEFAULT_SPEED.toString();
         score_form.value = "0";
         maximum_score_form.value = "0";
         width_form.value = renderer.canvas.width.toString();
         height_form.value = renderer.canvas.height.toString();
 
         this.game = game;
+        this.game_speed = DEFAULT_SPEED;
         this.grid = grid;
         this.rows_form = rows_form;
         this.columns_form = columns_form;
+        this.speed_form = speed_form;
         this.score_form = score_form;
         this.maximum_score_form = maximum_score_form;
         this.width_form = width_form;
@@ -170,6 +181,13 @@ class GameContext {
                         }
                     }
 
+                    let speed: number = +this.speed_form.value;
+
+                    if (speed < MINIMUM_SPEED || speed > MAXIMUM_SPEED) {
+                        alert(`The speed (${speed}) must be in range [${MINIMUM_SPEED}, ${MAXIMUM_SPEED}]`);
+                        speed = this.game_speed;
+                    }
+
                     let width: number = +this.width_form.value;
                     let height: number = +this.height_form.value;
 
@@ -192,13 +210,16 @@ class GameContext {
                         }
                     }
 
-                    const ratio = columns / rows;
+                    this.game_speed = speed;
 
                     this.rows_form.value = rows.toString();
                     this.columns_form.value = columns.toString();
+                    this.speed_form.value = speed.toString();
                     this.score_form.value = "0";
                     this.width_form.value = width.toString();
                     this.height_form.value = height.toString();
+
+                    const ratio = columns / rows;
 
                     this.renderer.canvas.width = width;
                     this.renderer.canvas.height = height;
@@ -220,7 +241,9 @@ class GameContext {
         switch (this.game.status)
         {
             case GameStatus.Going: {
-                if (ticks % 32 == 0) {
+                const moves_per_tick = (MAXIMUM_SPEED - this.game_speed + MINIMUM_SPEED);
+
+                if (ticks % moves_per_tick == 0) {
                     this.game.move();
                     this.score_form.value = this.game.score.toString();
                     this.maximum_score_form.value = this.game.maximum_score.toString();
