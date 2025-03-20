@@ -136,6 +136,16 @@ export class Mat4 {
     }
 };
 
+export function make_orthographic_projection(left: number, right: number, bottom: number, top: number): Mat4
+{
+    return new Mat4([
+        2.0 / (right - left), 0, 0, 0,
+        0, 2.0 / (top - bottom), 0, 0,
+        0, 0, 1, 0,
+        (-1.0) * (right + left) / (right - left), (-1.0) * (top + bottom) / (top - bottom), 0, 1,
+    ]);
+}
+
 export function rand_range(min: number, max: number): number
 {
     return Math.floor(Math.random() * (max - min) + min);

@@ -1,4 +1,4 @@
-import { critical_error_if, Vec2, Vec4, Mat4 } from "./nostd.js"
+import { Vec2, Vec4, Mat4, make_orthographic_projection, critical_error_if } from "./nostd.js"
 
 export const red_color = new Vec4(1, 0, 0, 1.0);
 export const green_color = new Vec4(0, 1, 0, 1.0);
@@ -71,6 +71,7 @@ export class VertexArrayBuffer {
 };
 
 export class Renderer {
+    canvas: HTMLCanvasElement;
     gl: WebGLRenderingContext;
     buffers: VertexArrayBuffer[];
     program: WebGLProgram;
@@ -81,8 +82,14 @@ export class Renderer {
     bottom: number = -6;
     top: number = 6;
 
-    constructor(gl: WebGLRenderingContext)
+    constructor(canvas: HTMLCanvasElement)
     {
+        const has_gl = canvas.getContext("webgl");
+
+        critical_error_if(!has_gl, "Unable to initialize WebGL. Your browser or machine may not support it");
+
+        const gl = has_gl!;
+
         const buffers = function(): VertexArrayBuffer[] {
             const buffer0 = function() {
                 const data = new Float32Array([
@@ -176,12 +183,7 @@ export class Renderer {
                 0, 0, 0, 1,
             ]);
 
-            const projection_matrix = new Mat4([
-                2.0 / (this.right - this.left), 0, 0, 0,
-                0, 2.0 / (this.top - this.bottom), 0, 0,
-                0, 0, 1, 0,
-                (-1.0) * (this.right + this.left) / (this.right - this.left), (-1.0) * (this.top + this.bottom) / (this.top - this.bottom), 0, 1,
-            ]);
+            const projection_matrix = make_orthographic_projection(this.left, this.right, this.bottom, this.top);
 
             const color = new Vec4(0, 0, 0, 1);
 
@@ -193,10 +195,42 @@ export class Renderer {
         };
         const uniforms = make_uniforms();
 
+        this.canvas = canvas;
         this.gl = gl;
         this.buffers = buffers;
         this.program = program;
         this.uniforms = uniforms;
+    }
+
+    rescale_projection(width_to_height_ratio: number): void
+    {
+        const uniform = this.uniforms.get("projection")!;
+
+        switch (uniform.data.tag)
+        {
+            case "matrix": {
+                // TODO: assumes ortho projection is at the center.
+                const left = this.left;
+                const right = this.right;
+                const bottom = this.bottom;
+                const top = this.top;
+
+                // (right - left) / (top - bottom) == width_to_height_ratio     =>
+                // (top - bottom) / (right - left) == 1 / width_to_height_ratio =>
+                // (top - bottom) == (right - left) / width_to_height_ratio     =>
+
+                const old_y_length = top - bottom;
+                const new_y_length = (right - left) / width_to_height_ratio;
+                const scale = new_y_length / old_y_length;
+                const new_bottom = bottom * scale;
+                const new_top = top * scale;
+
+                this.bottom = new_bottom;
+                this.top = new_top;
+
+                uniform.data.matrix = make_orthographic_projection(left, right, new_bottom, new_top);
+            } break;
+        }
     }
 
     bind(buffer_index: number): void

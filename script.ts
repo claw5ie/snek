@@ -10,11 +10,8 @@ function main(): void
     {
         const renderer = function(): Renderer {
             const canvas = document.getElementById("canvas") as HTMLCanvasElement;
-            const gl = canvas.getContext("webgl");
-
-            critical_error_if(!gl, "Unable to initialize WebGL. Your browser or machine may not support it");
-
-            return new Renderer(gl!);
+            critical_error_if(!canvas, "missing 'canvas' element");
+            return new Renderer(canvas);
         }();
 
         const game_context = new GameContext(renderer);
@@ -58,6 +55,14 @@ const MAXIMUM_COLUMN_COUNT = 32;
 const DEFAULT_ROW_COUNT = MINIMUM_ROW_COUNT;
 const DEFAULT_COLUMN_COUNT = MINIMUM_COLUMN_COUNT;
 
+// TODO: set sensible values
+const MINIMUM_WIDTH = 400;
+const MAXIMUM_WIDTH = 800;
+
+// TODO: set sensible values
+const MINIMUM_HEIGHT = 400;
+const MAXIMUM_HEIGHT = 800;
+
 class GameContext {
     game: Game;
 
@@ -66,6 +71,8 @@ class GameContext {
     rows_form: HTMLFormElement;
     columns_form: HTMLFormElement;
     score_form: HTMLFormElement;
+    width_form: HTMLFormElement;
+    height_form: HTMLFormElement;
 
     renderer: Renderer;
 
@@ -78,20 +85,28 @@ class GameContext {
         const rows_form = document.getElementById("rows") as HTMLFormElement;
         const columns_form = document.getElementById("columns") as HTMLFormElement;
         const score_form = document.getElementById("score") as HTMLFormElement;
+        const width_form = document.getElementById("width") as HTMLFormElement;
+        const height_form = document.getElementById("height") as HTMLFormElement;
 
         critical_error_if(!rows_form, "missing 'rows' form");
         critical_error_if(!columns_form, "missing 'columns' form");
         critical_error_if(!score_form, "missing 'score' form");
+        critical_error_if(!width_form, "missing 'width' form");
+        critical_error_if(!height_form, "missing 'height' form");
 
         rows_form.value = DEFAULT_ROW_COUNT.toString();
         columns_form.value = DEFAULT_COLUMN_COUNT.toString();
         score_form.value = "0";
+        width_form.value = renderer.canvas.width.toString();
+        height_form.value = renderer.canvas.height.toString();
 
         this.game = game;
         this.grid = grid;
         this.rows_form = rows_form;
         this.columns_form = columns_form;
         this.score_form = score_form;
+        this.width_form = width_form;
+        this.height_form = height_form;
         this.renderer = renderer;
 
         this.finish_initialization();
@@ -130,38 +145,67 @@ class GameContext {
                 case "r": {
                     let rows: number = +this.rows_form.value;
                     let columns: number = +this.columns_form.value;
-                    let ok = true;
 
-                    if (rows < MINIMUM_ROW_COUNT || rows > MAXIMUM_ROW_COUNT) {
-                        alert(`The number of rows (${rows}) must be in range [${MINIMUM_ROW_COUNT}, ${MAXIMUM_ROW_COUNT}]`);
-                        ok = false;
+                    {
+                        let ok = true;
+
+                        if (rows < MINIMUM_ROW_COUNT || rows > MAXIMUM_ROW_COUNT) {
+                            alert(`The number of rows (${rows}) must be in range [${MINIMUM_ROW_COUNT}, ${MAXIMUM_ROW_COUNT}]`);
+                            ok = false;
+                        }
+
+                        if (columns < MINIMUM_COLUMN_COUNT || columns > MAXIMUM_COLUMN_COUNT) {
+                            alert(`The number of columns (${columns}) must be in range [${MINIMUM_COLUMN_COUNT}, ${MAXIMUM_COLUMN_COUNT}]`);
+                            ok = false;
+                        }
+
+                        if (!ok) {
+                            columns = this.game.x_slices;
+                            rows = this.game.y_slices;
+                        }
                     }
 
-                    if (columns < MINIMUM_COLUMN_COUNT || columns > MAXIMUM_COLUMN_COUNT) {
-                        alert(`The number of columns (${columns}) must be in range [${MINIMUM_COLUMN_COUNT}, ${MAXIMUM_COLUMN_COUNT}]`);
-                        ok = false;
-                    }
+                    let width: number = +this.width_form.value;
+                    let height: number = +this.height_form.value;
 
-                    if (!ok) {
-                        columns = this.game.x_slices;
-                        rows = this.game.y_slices;
+                    {
+                        let ok = true;
+
+                        if (width < MINIMUM_WIDTH || width > MAXIMUM_WIDTH) {
+                            alert(`The width (${width}) must be in range [${MINIMUM_WIDTH}, ${MAXIMUM_WIDTH}]`);
+                            ok = false;
+                        }
+
+                        if (height < MINIMUM_HEIGHT || height > MAXIMUM_HEIGHT) {
+                            alert(`The height (${height}) must be in range [${MINIMUM_HEIGHT}, ${MAXIMUM_HEIGHT}]`);
+                            ok = false;
+                        }
+
+                        if (!ok) {
+                            width = this.renderer.canvas.width;
+                            height = this.renderer.canvas.height;
+                        }
                     }
 
                     this.rows_form.value = rows.toString();
                     this.columns_form.value = columns.toString();
                     this.score_form.value = "0";
+                    this.width_form.value = width.toString();
+                    this.height_form.value = height.toString();
 
-                    this.reset(columns, rows);
+                    this.renderer.canvas.width = width;
+                    this.renderer.canvas.height = height;
+                    this.renderer.gl.viewport(0, 0, width, height);
+                    this.renderer.rescale_projection(width / height);
+
+                    this.grid = make_grid(this.renderer, columns, rows);
+
+                    this.game.reset(columns, rows);
+
                     ticks = 0;
                 } break;
             }
         });
-    }
-
-    reset(columns: number, rows: number): void
-    {
-        this.game.reset(columns, rows);
-        this.grid = make_grid(this.renderer, columns, rows);
     }
 
     move(): void
@@ -229,6 +273,7 @@ class GameContext {
     }
 };
 
+// TODO: put left, right, bottom, top into a class.
 function make_grid(renderer: Renderer, x_slices: number, y_slices: number): Float32Array
 {
     const x_line_count = x_slices + 1;
