@@ -216,8 +216,6 @@ class GameContext {
                     this.columns_form.value = columns.toString();
                     this.speed_form.value = speed.toString();
                     this.score_form.value = "0";
-                    this.width_form.value = width.toString();
-                    this.height_form.value = height.toString();
 
                     const ratio = columns / rows;
 
@@ -225,6 +223,9 @@ class GameContext {
                     this.renderer.canvas.height = height;
                     this.renderer.rescale_canvas(ratio);
                     this.renderer.rescale_projection(ratio);
+
+                    this.width_form.value = width.toString();
+                    this.height_form.value = height.toString();
 
                     this.grid = make_grid(this.renderer, columns, rows);
 
