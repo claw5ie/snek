@@ -241,7 +241,7 @@ export class Renderer {
 
     bind(buffer_index: number): void
     {
-        const array_buffer = this.buffers[buffer_index];
+        const array_buffer = this.buffers[buffer_index]!;
 
         this.gl.bindBuffer(this.gl.ARRAY_BUFFER, array_buffer.buffer);
         for (const attribute of array_buffer.attributes)
@@ -305,7 +305,7 @@ export class Renderer {
         critical_error_if(points.length % 4 != 0, "expected 4 points per line (start.x, start.y, end.x, end.y)");
 
         // TODO: remove magic number (buffer index == 1).
-        const array_buffer = this.buffers[1];
+        const array_buffer = this.buffers[1]!;
 
         critical_error_if(array_buffer.buffer_size < points.length * 4, `drawing too many lines (${points.length} points)`)
 

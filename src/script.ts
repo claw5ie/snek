@@ -1,6 +1,6 @@
-import { critical_error_if, Vec2, Vec4 } from "./src/nostd.js"
-import { Game, GameStatus } from "./src/game.js"
-import { Renderer, red_color, green_color, dark_red_color } from "./src/opengl.js"
+import { critical_error_if, Vec2, Vec4 } from "./nostd.js"
+import { Game, GameStatus } from "./game.js"
+import { Renderer, red_color, green_color, dark_red_color } from "./opengl.js"
 
 var ticks: number = 0;
 

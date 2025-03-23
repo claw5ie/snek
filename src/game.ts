@@ -72,13 +72,6 @@ export class Game {
 
     constructor(x_slices: number, y_slices: number)
     {
-        this.maximum_score = 0;
-        this.reset(x_slices, y_slices);
-    }
-
-    // NOTE: doesn't reset maximum score.
-    reset(x_slices: number, y_slices: number): void
-    {
         const snake = new Snake(new Vec2(x_slices / 2, y_slices / 2));
 
         this.x_slices = x_slices;
@@ -87,6 +80,20 @@ export class Game {
         this.food = this.find_food_position()!;
         this.status = GameStatus.Going;
         this.score = 0;
+        this.maximum_score = 0;
+    }
+
+    // NOTE: doesn't reset maximum score.
+    reset(x_slices: number, y_slices: number): void
+    {
+        const new_game = new Game(x_slices, y_slices);
+
+        this.x_slices = new_game.x_slices;
+        this.y_slices = new_game.y_slices;
+        this.snake = new_game.snake;
+        this.food = new_game.food;
+        this.status = new_game.status;
+        this.score = new_game.score;
     }
 
     find_food_position(): Vec2 | null
