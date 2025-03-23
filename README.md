@@ -1,7 +1,7 @@
 ## Compilation/Execution
 Compile the project
 ```
-tsc -lib es2015,dom --target es2015 script.ts
+tsc
 ```
 
 Run a server at the root directory
